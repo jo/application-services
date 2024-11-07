@@ -28,8 +28,78 @@
 // To make life a little easier, we do that via a struct.
 
 use crate::error::*;
+use std::sync::Arc;
+// use serde::{de::DeserializeOwned, Serialize};
 
 pub type EncryptorDecryptor = jwcrypto::EncryptorDecryptor<Error>;
+
+pub trait EncryptorDecryptorTrait: Send + Sync {
+    fn encrypt(&self, cleartext: Vec<u8>, description: String) -> ApiResult<Vec<u8>>;
+    fn decrypt(&self, ciphertext: Vec<u8>, description: String) -> ApiResult<Vec<u8>>;
+
+    // fn encrypt_struct<T: Serialize>(&self, fields: &T, description: &str) -> Result<String, E> {
+    //     let json = serde_json::to_string(fields).to_encdec_result(description)?;
+    //     self.encrypt(json.as_bytes().into(), description)
+    // }
+
+    // fn decrypt_struct<T: DeserializeOwned>(
+    //     &self,
+    //     ciphertext: &str,
+    //     description: &str,
+    // ) -> Result<T, E> {
+    //     let json = self.decrypt(ciphertext.as_bytes().into(), description)?;
+    //     Ok(serde_json::from_str(&json).to_encdec_result(description)?)
+    // }
+}
+
+pub trait KeyManager: Send + Sync {
+    fn get_key(&self) -> ApiResult<Vec<u8>>;
+}
+
+pub struct ManagedEncryptorDecryptor {
+    key_manager: Arc<dyn KeyManager>,
+}
+
+impl ManagedEncryptorDecryptor {
+    pub fn new(key_manager: Arc<dyn KeyManager>) -> Self {
+        Self { key_manager }
+    }
+}
+
+impl EncryptorDecryptorTrait for ManagedEncryptorDecryptor {
+    #[handle_error(Error)]
+    fn encrypt(&self, cleartext: Vec<u8>, description: String) -> ApiResult<Vec<u8>> {
+        let key = self.key_manager.get_key().unwrap();
+        let encdec = EncryptorDecryptor::new(std::str::from_utf8(&key).unwrap())?;
+        encdec
+            .encrypt(std::str::from_utf8(&cleartext).unwrap(), &description)
+            .map(|text| text.into())
+    }
+
+    #[handle_error(Error)]
+    fn decrypt(&self, ciphertext: Vec<u8>, description: String) -> ApiResult<Vec<u8>> {
+        let key = self.key_manager.get_key().unwrap();
+        let encdec = EncryptorDecryptor::new(std::str::from_utf8(&key).unwrap())?;
+        encdec
+            .decrypt(std::str::from_utf8(&ciphertext).unwrap(), &description)
+            .map(|text| text.into())
+    }
+}
+
+// temporary struct to ease transition
+pub struct StaticKeyManager {
+    key: String,
+}
+impl StaticKeyManager {
+    pub fn new(key: String) -> Self {
+        Self { key }
+    }
+}
+impl KeyManager for StaticKeyManager {
+    fn get_key(&self) -> ApiResult<Vec<u8>> {
+        Ok(self.key.as_bytes().into())
+    }
+}
 
 #[handle_error(Error)]
 pub fn create_canary(text: &str, key: &str) -> ApiResult<String> {
@@ -55,6 +125,7 @@ pub mod test_utils {
         pub static ref TEST_ENCRYPTION_KEY: String = serde_json::to_string(&jwcrypto::Jwk::new_direct_key(Some("test-key".to_string())).unwrap()).unwrap();
         pub static ref TEST_ENCRYPTOR: EncryptorDecryptor = EncryptorDecryptor::new(&TEST_ENCRYPTION_KEY).unwrap();
     }
+
     pub fn encrypt(value: &str) -> String {
         TEST_ENCRYPTOR.encrypt(value, "test encrypt").unwrap()
     }
@@ -70,6 +141,19 @@ pub mod test_utils {
         TEST_ENCRYPTOR
             .decrypt_struct(&ciphertext, "test decrypt struct")
             .unwrap()
+    }
+
+    pub struct TestKeyManager {}
+    impl KeyManager for TestKeyManager {
+        fn get_key(&self) -> ApiResult<Vec<u8>> {
+            Ok(TEST_ENCRYPTION_KEY.as_bytes().into())
+        }
+    }
+
+    lazy_static::lazy_static! {
+        // TODO: this does not work, rustc moans about ManagedEncryptorDecryptor not implementing
+        // the EncryptorDecryptorTrait...
+        pub static ref TEST_TRAIT_BASED_ENCRYPTOR: ManagedEncryptorDecryptor = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
     }
 }
 
