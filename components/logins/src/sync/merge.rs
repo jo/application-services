@@ -4,11 +4,12 @@
 
 // Merging for Sync.
 use super::{IncomingLogin, LoginPayload};
-use crate::encryption::EncryptorDecryptor;
+use crate::encryption::EncryptorDecryptorTrait;
 use crate::error::*;
 use crate::login::EncryptedLogin;
 use crate::util;
 use rusqlite::Row;
+use std::sync::Arc;
 use std::time::SystemTime;
 use sync15::bso::{IncomingBso, IncomingKind};
 use sync15::ServerTimestamp;
@@ -144,7 +145,7 @@ impl SyncLoginData {
         &self.guid
     }
 
-    pub fn from_bso(bso: IncomingBso, encdec: &EncryptorDecryptor) -> Result<Self> {
+    pub fn from_bso(bso: IncomingBso, encdec: Arc<dyn EncryptorDecryptorTrait>) -> Result<Self> {
         let guid = bso.envelope.id.clone();
         let inbound_ts = bso.envelope.modified;
         let inbound = match bso.into_content::<LoginPayload>().kind {
@@ -279,7 +280,7 @@ impl EncryptedLogin {
     pub(crate) fn apply_delta(
         &mut self,
         mut delta: LoginDelta,
-        encdec: &EncryptorDecryptor,
+        encdec: Arc<dyn EncryptorDecryptorTrait>,
     ) -> Result<()> {
         apply_field!(self, delta, origin);
 
@@ -290,14 +291,14 @@ impl EncryptedLogin {
         apply_field!(self, delta, password_field);
         apply_field!(self, delta, username_field);
 
-        let mut sec_fields = self.decrypt_fields(encdec)?;
+        let mut sec_fields = self.decrypt_fields(encdec.clone())?;
         if let Some(password) = delta.password.take() {
             sec_fields.password = password;
         }
         if let Some(username) = delta.username.take() {
             sec_fields.username = username;
         }
-        self.sec_fields = sec_fields.encrypt(encdec)?;
+        self.sec_fields = sec_fields.encrypt(encdec.clone())?;
 
         // Use Some("") to indicate that it should be changed to be None (hacky...)
         if let Some(realm) = delta.http_realm.take() {
@@ -315,7 +316,7 @@ impl EncryptedLogin {
     pub(crate) fn delta(
         &self,
         older: &EncryptedLogin,
-        encdec: &EncryptorDecryptor,
+        encdec: Arc<dyn EncryptorDecryptorTrait>,
     ) -> Result<LoginDelta> {
         let mut delta = LoginDelta::default();
 
@@ -331,8 +332,8 @@ impl EncryptedLogin {
         if self.fields.origin != older.fields.origin {
             delta.origin = Some(self.fields.origin.clone());
         }
-        let older_sec_fields = older.decrypt_fields(encdec)?;
-        let self_sec_fields = self.decrypt_fields(encdec)?;
+        let older_sec_fields = older.decrypt_fields(encdec.clone())?;
+        let self_sec_fields = self.decrypt_fields(encdec.clone())?;
         if self_sec_fields.username != older_sec_fields.username {
             delta.username = Some(self_sec_fields.username.clone());
         }
@@ -380,7 +381,8 @@ impl EncryptedLogin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::encryption::test_utils::TEST_ENCRYPTOR;
+    use crate::encryption::{test_utils::TestKeyManager, ManagedEncryptorDecryptor};
+    use std::sync::Arc;
 
     #[test]
     fn test_invalid_payload_timestamps() {
@@ -396,7 +398,8 @@ mod tests {
             "timeLastUsed": "some other garbage",
             "timePasswordChanged": -30, // valid i64 but negative
         }));
-        let login = SyncLoginData::from_bso(bad_payload, &TEST_ENCRYPTOR)
+        let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
+        let login = SyncLoginData::from_bso(bad_payload, Arc::new(encdec))
             .unwrap()
             .inbound
             .unwrap()
@@ -417,7 +420,8 @@ mod tests {
             "timePasswordChanged": now64 - 25,
         }));
 
-        let login = SyncLoginData::from_bso(good_payload, &TEST_ENCRYPTOR)
+        let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
+        let login = SyncLoginData::from_bso(good_payload, Arc::new(encdec))
             .unwrap()
             .inbound
             .unwrap()

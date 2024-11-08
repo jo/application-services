@@ -278,9 +278,10 @@
 //! - `Login::fixup()`:   Returns either the existing login if it is valid, a clone with invalid fields
 //!                       fixed up if it was safe to do so, or an error if the login is irreparably invalid.
 
-use crate::{encryption::EncryptorDecryptor, error::*};
+use crate::{encryption::EncryptorDecryptorTrait, error::*};
 use rusqlite::Row;
 use serde_derive::*;
+use std::sync::Arc;
 use sync_guid::Guid;
 use url::Url;
 
@@ -366,13 +367,37 @@ pub struct SecureLoginFields {
 }
 
 impl SecureLoginFields {
-    pub fn encrypt(&self, encdec: &EncryptorDecryptor) -> Result<String> {
-        encdec.encrypt_struct(&self, "encrypt SecureLoginFields")
+    // TODO: FIXME: this is hacky hack
+    pub fn encrypt(&self, encdec: Arc<dyn EncryptorDecryptorTrait>) -> Result<String> {
+        let description = "encrypt SecureLoginFields";
+        let string = serde_json::to_string(&self)?;
+        Ok(std::str::from_utf8(
+            &encdec
+                .encrypt(string.as_bytes().into(), description.to_owned())
+                .unwrap(),
+        )
+        .unwrap()
+        .into())
     }
 
-    pub fn decrypt(ciphertext: &str, encdec: &EncryptorDecryptor) -> Result<Self> {
-        encdec.decrypt_struct(ciphertext, "decrypt SecureLoginFields")
+    // TODO: FIXME: this is hacky hack, too
+    pub fn decrypt(ciphertext: &str, encdec: Arc<dyn EncryptorDecryptorTrait>) -> Result<Self> {
+        let description = "decrypt SecureLoginFields";
+        let json = encdec
+            .decrypt(ciphertext.as_bytes().into(), description.to_owned())
+            .unwrap();
+        Ok(serde_json::from_str(
+            std::str::from_utf8(&json).unwrap().into(),
+        )?)
     }
+
+    // pub fn encrypt(&self, encdec: &dyn EncryptorDecryptorTrait) -> Result<String> {
+    //     encdec.encrypt_struct(&self, "encrypt SecureLoginFields")
+    // }
+
+    // pub fn decrypt(ciphertext: &str, encdec: &dyn EncryptorDecryptorTrait) -> Result<Self> {
+    //     encdec.decrypt_struct(ciphertext, "decrypt SecureLoginFields")
+    // }
 }
 
 /// Login data specific to database records
@@ -413,7 +438,7 @@ impl Login {
         }
     }
 
-    pub fn encrypt(self, encdec: &EncryptorDecryptor) -> Result<EncryptedLogin> {
+    pub fn encrypt(self, encdec: Arc<dyn EncryptorDecryptorTrait>) -> Result<EncryptedLogin> {
         Ok(EncryptedLogin {
             record: self.record,
             fields: self.fields,
@@ -442,7 +467,7 @@ impl EncryptedLogin {
         &self.record.id
     }
 
-    pub fn decrypt(self, encdec: &EncryptorDecryptor) -> Result<Login> {
+    pub fn decrypt(self, encdec: Arc<dyn EncryptorDecryptorTrait>) -> Result<Login> {
         Ok(Login {
             record: self.record,
             fields: self.fields,
@@ -450,7 +475,10 @@ impl EncryptedLogin {
         })
     }
 
-    pub fn decrypt_fields(&self, encdec: &EncryptorDecryptor) -> Result<SecureLoginFields> {
+    pub fn decrypt_fields(
+        &self,
+        encdec: Arc<dyn EncryptorDecryptorTrait>,
+    ) -> Result<SecureLoginFields> {
         SecureLoginFields::decrypt(&self.sec_fields, encdec)
     }
 
@@ -720,6 +748,7 @@ pub mod test_utils {
                 origin: format!("https://{}.example.com", id),
                 ..Default::default()
             },
+            // TODO: fixme
             sec_fields: encrypt_struct(&sec_fields),
         }
     }

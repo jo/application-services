@@ -4,11 +4,12 @@
 
 use super::merge::{LocalLogin, MirrorLogin};
 use super::{IncomingLogin, SyncStatus};
-use crate::encryption::EncryptorDecryptor;
+use crate::encryption::EncryptorDecryptorTrait;
 use crate::error::*;
 use crate::util;
 use interrupt_support::SqlInterruptScope;
 use rusqlite::{named_params, Connection};
+use std::sync::Arc;
 use std::time::SystemTime;
 use sync15::ServerTimestamp;
 use sync_guid::Guid;
@@ -54,7 +55,7 @@ impl UpdatePlan {
         upstream: IncomingLogin,
         upstream_time: ServerTimestamp,
         server_now: ServerTimestamp,
-        encdec: &EncryptorDecryptor,
+        encdec: Arc<dyn EncryptorDecryptorTrait>,
     ) -> Result<()> {
         let local_age = SystemTime::now()
             .duration_since(local.local_modified())
@@ -62,7 +63,7 @@ impl UpdatePlan {
         let remote_age = server_now.duration_since(upstream_time).unwrap_or_default();
 
         let delta = {
-            let upstream_delta = upstream.login.delta(&shared.login, encdec)?;
+            let upstream_delta = upstream.login.delta(&shared.login, encdec.clone())?;
             match local {
                 LocalLogin::Tombstone { .. } => {
                     // If the login was deleted locally, the merged delta is the
@@ -78,7 +79,7 @@ impl UpdatePlan {
                     upstream_delta
                 }
                 LocalLogin::Alive { login, .. } => {
-                    let local_delta = login.delta(&shared.login, encdec)?;
+                    let local_delta = login.delta(&shared.login, encdec.clone())?;
                     local_delta.merge(upstream_delta, remote_age < local_age)
                 }
             }
@@ -323,8 +324,9 @@ mod tests {
         get_server_modified, insert_encrypted_login, insert_login,
     };
     use crate::db::LoginDb;
-    use crate::encryption::test_utils::TEST_ENCRYPTOR;
+    use crate::encryption::{test_utils::TestKeyManager, ManagedEncryptorDecryptor};
     use crate::login::test_utils::enc_login;
+    use std::sync::Arc;
 
     fn inc_login(id: &str, password: &str) -> crate::sync::IncomingLogin {
         IncomingLogin {
@@ -463,6 +465,7 @@ mod tests {
             unknown: None,
         };
 
+        let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
         update_plan
             .plan_three_way_merge(
                 local_login,
@@ -470,7 +473,7 @@ mod tests {
                 upstream_login,
                 server_record_timestamp.try_into().unwrap(),
                 server_timestamp.try_into().unwrap(),
-                &TEST_ENCRYPTOR,
+                Arc::new(encdec),
             )
             .unwrap();
         update_plan
@@ -529,6 +532,7 @@ mod tests {
             unknown: None,
         };
 
+        let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
         update_plan
             .plan_three_way_merge(
                 local_login,
@@ -536,7 +540,7 @@ mod tests {
                 upstream_login,
                 server_record_timestamp.try_into().unwrap(),
                 server_timestamp.try_into().unwrap(),
-                &TEST_ENCRYPTOR,
+                Arc::new(encdec),
             )
             .unwrap();
         update_plan
@@ -600,6 +604,7 @@ mod tests {
             unknown: None,
         };
 
+        let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
         update_plan
             .plan_three_way_merge(
                 local_login,
@@ -607,7 +612,7 @@ mod tests {
                 upstream_login,
                 server_record_timestamp.try_into().unwrap(),
                 server_timestamp.try_into().unwrap(),
-                &TEST_ENCRYPTOR,
+                Arc::new(encdec),
             )
             .unwrap();
         update_plan

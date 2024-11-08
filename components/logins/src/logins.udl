@@ -108,18 +108,27 @@ interface LoginsApiError {
 };
 
 
+[Trait, WithForeign]
+interface EncryptorDecryptorTrait {
+    [Throws=LoginsApiError]
+    bytes encrypt(bytes cleartext, string description);
+
+    [Throws=LoginsApiError]
+    bytes decrypt(bytes ciphertext, string description);
+};
+
 interface LoginStore {
     [Throws=LoginsApiError]
-    constructor(string path);
+    constructor(string path, EncryptorDecryptorTrait encdec);
 
     [Throws=LoginsApiError]
-    EncryptedLogin add(LoginEntry login, [ByRef]string encryption_key);
+    Login add(LoginEntry login);
 
     [Throws=LoginsApiError]
-    EncryptedLogin update([ByRef] string id, LoginEntry login, [ByRef]string encryption_key);
+    Login update([ByRef] string id, LoginEntry login);
 
     [Throws=LoginsApiError]
-    EncryptedLogin add_or_update(LoginEntry login, [ByRef]string encryption_key);
+    Login add_or_update(LoginEntry login);
 
     [Throws=LoginsApiError]
     boolean delete([ByRef] string id);
@@ -134,16 +143,16 @@ interface LoginStore {
     void touch([ByRef] string id);
 
     [Throws=LoginsApiError]
-    sequence<EncryptedLogin> list();
+    sequence<Login> list();
 
     [Throws=LoginsApiError]
-    sequence<EncryptedLogin> get_by_base_domain([ByRef] string base_domain);
+    sequence<Login> get_by_base_domain([ByRef] string base_domain);
 
     [Throws=LoginsApiError]
-    Login? find_login_to_update(LoginEntry look, [ByRef]string encryption_key);
+    Login? find_login_to_update(LoginEntry look);
 
     [Throws=LoginsApiError]
-    EncryptedLogin? get([ByRef] string id);
+    Login? get([ByRef] string id);
 
     [Self=ByArc]
     void register_with_sync_manager();
