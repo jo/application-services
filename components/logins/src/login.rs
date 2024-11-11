@@ -367,35 +367,25 @@ pub struct SecureLoginFields {
 }
 
 impl SecureLoginFields {
-    // TODO: FIXME: this is hacky hack
     pub fn encrypt(&self, encdec: Arc<dyn EncryptorDecryptorTrait>) -> Result<String> {
         let description = "encrypt SecureLoginFields";
         let string = serde_json::to_string(&self)?;
-        Ok(std::str::from_utf8(
-            &encdec
-                .encrypt(string.as_bytes().into(), description.to_owned())
-                .unwrap(),
-        )
-        .unwrap()
-        .into())
+        let cipherbytes = encdec
+            .encrypt(string.as_bytes().into(), description.to_owned())
+            .unwrap();
+        let ciphertext = std::str::from_utf8(&cipherbytes).unwrap();
+        Ok(ciphertext.to_owned())
     }
 
-    // TODO: FIXME: this is hacky hack, too
     pub fn decrypt(ciphertext: &str, encdec: Arc<dyn EncryptorDecryptorTrait>) -> Result<Self> {
         let description = "decrypt SecureLoginFields";
-        let json = encdec
+        let jsonbytes = encdec
             .decrypt(ciphertext.as_bytes().into(), description.to_owned())
             .unwrap();
-        Ok(serde_json::from_str(std::str::from_utf8(&json).unwrap())?)
+        let jsonstring = std::str::from_utf8(&jsonbytes).unwrap();
+        let result = serde_json::from_str(jsonstring)?;
+        Ok(result)
     }
-
-    // pub fn encrypt(&self, encdec: &dyn EncryptorDecryptorTrait) -> Result<String> {
-    //     encdec.encrypt_struct(&self, "encrypt SecureLoginFields")
-    // }
-
-    // pub fn decrypt(ciphertext: &str, encdec: &dyn EncryptorDecryptorTrait) -> Result<Self> {
-    //     encdec.decrypt_struct(ciphertext, "decrypt SecureLoginFields")
-    // }
 }
 
 /// Login data specific to database records

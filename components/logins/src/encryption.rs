@@ -36,20 +36,6 @@ pub type EncryptorDecryptor = jwcrypto::EncryptorDecryptor<Error>;
 pub trait EncryptorDecryptorTrait: Send + Sync {
     fn encrypt(&self, cleartext: Vec<u8>, description: String) -> ApiResult<Vec<u8>>;
     fn decrypt(&self, ciphertext: Vec<u8>, description: String) -> ApiResult<Vec<u8>>;
-
-    // fn encrypt_struct<T: Serialize>(&self, fields: &T, description: &str) -> Result<String, E> {
-    //     let json = serde_json::to_string(fields).to_encdec_result(description)?;
-    //     self.encrypt(json.as_bytes().into(), description)
-    // }
-
-    // fn decrypt_struct<T: DeserializeOwned>(
-    //     &self,
-    //     ciphertext: &str,
-    //     description: &str,
-    // ) -> Result<T, E> {
-    //     let json = self.decrypt(ciphertext.as_bytes().into(), description)?;
-    //     Ok(serde_json::from_str(&json).to_encdec_result(description)?)
-    // }
 }
 
 pub trait KeyManager: Send + Sync {

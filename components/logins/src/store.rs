@@ -86,7 +86,6 @@ impl LoginStore {
 
     #[handle_error(Error)]
     pub fn get(&self, id: &str) -> ApiResult<Option<Login>> {
-        // FIXME: whats an ideomatic way to write this?
         match self.db.lock().get_by_id(id) {
             Ok(result) => match result {
                 Some(enc_login) => enc_login.decrypt(self.encdec.clone()).map(Some),
@@ -318,26 +317,24 @@ mod test {
         assert_eq!(b_after_update.record.times_used, 2);
     }
 
-    // FIXME: commented out, something wrong with the Arc
-    // #[test]
-    // fn test_sync_manager_registration() {
-    //     let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
-    //     let store = LoginStore::new_in_memory(Arc::new(encdec)).unwrap();
-    //     assert_eq!(Arc::strong_count(&store), 1);
-    //     assert_eq!(Arc::weak_count(&store), 0);
-    //     Arc::clone(&store).register_with_sync_manager();
-    //     assert_eq!(Arc::strong_count(&store), 1);
-    //     assert_eq!(Arc::weak_count(&store), 1);
-    //     let registered = STORE_FOR_MANAGER.lock().upgrade().expect("should upgrade");
-    //     assert!(Arc::ptr_eq(&store, &registered));
-    //     drop(registered);
-    //     // should be no new references
-    //     assert_eq!(Arc::strong_count(&store), 1);
-    //     assert_eq!(Arc::weak_count(&store), 1);
-    //     // dropping the registered object should drop the registration.
-    //     drop(store);
-    //     assert!(STORE_FOR_MANAGER.lock().upgrade().is_none());
-    // }
+    #[test]
+    fn test_sync_manager_registration() {
+        let store = Arc::new(LoginStore::new_in_memory(TEST_ENCRYPTOR_ARC.clone()).unwrap());
+        assert_eq!(Arc::strong_count(&store), 1);
+        assert_eq!(Arc::weak_count(&store), 0);
+        Arc::clone(&store).register_with_sync_manager();
+        assert_eq!(Arc::strong_count(&store), 1);
+        assert_eq!(Arc::weak_count(&store), 1);
+        let registered = STORE_FOR_MANAGER.lock().upgrade().expect("should upgrade");
+        assert!(Arc::ptr_eq(&store, &registered));
+        drop(registered);
+        // should be no new references
+        assert_eq!(Arc::strong_count(&store), 1);
+        assert_eq!(Arc::weak_count(&store), 1);
+        // dropping the registered object should drop the registration.
+        drop(store);
+        assert!(STORE_FOR_MANAGER.lock().upgrade().is_none());
+    }
 }
 
 #[test]
