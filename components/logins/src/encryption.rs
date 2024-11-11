@@ -151,9 +151,7 @@ pub mod test_utils {
     }
 
     lazy_static::lazy_static! {
-        // TODO: this does not work, rustc moans about ManagedEncryptorDecryptor not implementing
-        // the EncryptorDecryptorTrait...
-        pub static ref TEST_TRAIT_BASED_ENCRYPTOR: ManagedEncryptorDecryptor = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
+        pub static ref TEST_ENCRYPTOR_ARC: Arc<ManagedEncryptorDecryptor> = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
     }
 }
 

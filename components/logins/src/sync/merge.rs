@@ -381,8 +381,7 @@ impl EncryptedLogin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::encryption::{test_utils::TestKeyManager, ManagedEncryptorDecryptor};
-    use std::sync::Arc;
+    use crate::encryption::test_utils::TEST_ENCRYPTOR_ARC;
 
     #[test]
     fn test_invalid_payload_timestamps() {
@@ -398,8 +397,7 @@ mod tests {
             "timeLastUsed": "some other garbage",
             "timePasswordChanged": -30, // valid i64 but negative
         }));
-        let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
-        let login = SyncLoginData::from_bso(bad_payload, Arc::new(encdec))
+        let login = SyncLoginData::from_bso(bad_payload, TEST_ENCRYPTOR_ARC.clone())
             .unwrap()
             .inbound
             .unwrap()
@@ -420,8 +418,7 @@ mod tests {
             "timePasswordChanged": now64 - 25,
         }));
 
-        let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
-        let login = SyncLoginData::from_bso(good_payload, Arc::new(encdec))
+        let login = SyncLoginData::from_bso(good_payload, TEST_ENCRYPTOR_ARC.clone())
             .unwrap()
             .inbound
             .unwrap()

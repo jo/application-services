@@ -510,10 +510,7 @@ impl SyncEngine for LoginsSyncEngine {
 mod tests {
     use super::*;
     use crate::db::test_utils::insert_login;
-    use crate::encryption::{
-        test_utils::{TestKeyManager, TEST_ENCRYPTION_KEY},
-        ManagedEncryptorDecryptor,
-    };
+    use crate::encryption::test_utils::{TEST_ENCRYPTION_KEY, TEST_ENCRYPTOR_ARC};
     use crate::login::test_utils::enc_login;
     use crate::{LoginEntry, LoginFields, RecordFields, SecureLoginFields};
     use std::collections::HashMap;
@@ -542,8 +539,7 @@ mod tests {
     #[test]
     fn test_fetch_login_data() {
         // Test some common cases with fetch_login data
-        let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
-        let store = LoginStore::new_in_memory(encdec.clone()).unwrap();
+        let store = LoginStore::new_in_memory(TEST_ENCRYPTOR_ARC.clone()).unwrap();
         insert_login(&store.db.lock(), "updated_remotely", None, Some("password"));
         insert_login(&store.db.lock(), "deleted_remotely", None, Some("password"));
         insert_login(
@@ -560,15 +556,15 @@ mod tests {
             vec![
                 IncomingBso::new_test_tombstone(Guid::new("deleted_remotely")),
                 enc_login("added_remotely", "password")
-                    .into_bso(encdec.clone(), None)
+                    .into_bso(TEST_ENCRYPTOR_ARC.clone(), None)
                     .unwrap()
                     .to_test_incoming(),
                 enc_login("updated_remotely", "new-password")
-                    .into_bso(encdec.clone(), None)
+                    .into_bso(TEST_ENCRYPTOR_ARC.clone(), None)
                     .unwrap()
                     .to_test_incoming(),
                 enc_login("three_way_merge", "new-remote-password")
-                    .into_bso(encdec.clone(), None)
+                    .into_bso(TEST_ENCRYPTOR_ARC.clone(), None)
                     .unwrap()
                     .to_test_incoming(),
             ],
@@ -590,13 +586,16 @@ mod tests {
                         let LocalLogin::Alive { login, .. } = local_login else {
                             unreachable!("this test is not expecting a tombstone");
                         };
-                        login.decrypt_fields(encdec.clone()).unwrap().password
+                        login
+                            .decrypt_fields(TEST_ENCRYPTOR_ARC.clone())
+                            .unwrap()
+                            .password
                     }),
                     mirror: sync_login_data.mirror.map(|mirror_login| {
                         guids_seen.insert(mirror_login.login.record.id.clone());
                         mirror_login
                             .login
-                            .decrypt_fields(encdec.clone())
+                            .decrypt_fields(TEST_ENCRYPTOR_ARC.clone())
                             .unwrap()
                             .password
                     }),
@@ -604,7 +603,7 @@ mod tests {
                         guids_seen.insert(incoming.login.record.id.clone());
                         incoming
                             .login
-                            .decrypt_fields(encdec.clone())
+                            .decrypt_fields(TEST_ENCRYPTOR_ARC.clone())
                             .unwrap()
                             .password
                     }),
@@ -650,8 +649,7 @@ mod tests {
 
     #[test]
     fn test_fetch_outgoing() {
-        let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
-        let store = LoginStore::new_in_memory(Arc::new(encdec)).unwrap();
+        let store = LoginStore::new_in_memory(TEST_ENCRYPTOR_ARC.clone()).unwrap();
         insert_login(
             &store.db.lock(),
             "changed",
@@ -683,8 +681,7 @@ mod tests {
 
     #[test]
     fn test_bad_record() {
-        let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
-        let store = LoginStore::new_in_memory(Arc::new(encdec)).unwrap();
+        let store = LoginStore::new_in_memory(TEST_ENCRYPTOR_ARC.clone()).unwrap();
         let test_ids = ["dummy_000001", "dummy_000002", "dummy_000003"];
         for id in test_ids {
             insert_login(&store.db.lock(), id, Some("password"), Some("password"));
@@ -726,7 +723,6 @@ mod tests {
         fao: Option<String>,
         realm: Option<String>,
     ) -> EncryptedLogin {
-        let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
         EncryptedLogin {
             record: RecordFields {
                 id: Guid::random().to_string(),
@@ -742,15 +738,14 @@ mod tests {
                 username: username.into(),
                 password: password.into(),
             }
-            .encrypt(encdec)
+            .encrypt(TEST_ENCRYPTOR_ARC.clone())
             .unwrap(),
         }
     }
 
     #[test]
     fn find_dupe_login() {
-        let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
-        let store = LoginStore::new_in_memory(encdec.clone()).unwrap();
+        let store = LoginStore::new_in_memory(TEST_ENCRYPTOR_ARC.clone()).unwrap();
 
         let to_add = LoginEntry {
             fields: LoginFields {
@@ -895,8 +890,7 @@ mod tests {
         }
 
         // The test itself...
-        let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
-        let store = LoginStore::new_in_memory(encdec.clone()).unwrap();
+        let store = LoginStore::new_in_memory(TEST_ENCRYPTOR_ARC.clone()).unwrap();
         let mut engine = LoginsSyncEngine::new(Arc::new(store)).unwrap();
         engine
             .set_local_encryption_key(&TEST_ENCRYPTION_KEY)
@@ -980,8 +974,7 @@ mod tests {
         // The test itself...
         let (local_timestamp, remote_timestamp) = if local_newer { (123, 0) } else { (0, 123) };
 
-        let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
-        let store = LoginStore::new_in_memory(encdec.clone()).unwrap();
+        let store = LoginStore::new_in_memory(TEST_ENCRYPTOR_ARC.clone()).unwrap();
         let mut engine = LoginsSyncEngine::new(Arc::new(store)).unwrap();
         engine
             .set_local_encryption_key(&TEST_ENCRYPTION_KEY)

@@ -324,9 +324,8 @@ mod tests {
         get_server_modified, insert_encrypted_login, insert_login,
     };
     use crate::db::LoginDb;
-    use crate::encryption::{test_utils::TestKeyManager, ManagedEncryptorDecryptor};
+    use crate::encryption::test_utils::TEST_ENCRYPTOR_ARC;
     use crate::login::test_utils::enc_login;
-    use std::sync::Arc;
 
     fn inc_login(id: &str, password: &str) -> crate::sync::IncomingLogin {
         IncomingLogin {
@@ -465,7 +464,6 @@ mod tests {
             unknown: None,
         };
 
-        let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
         update_plan
             .plan_three_way_merge(
                 local_login,
@@ -473,7 +471,7 @@ mod tests {
                 upstream_login,
                 server_record_timestamp.try_into().unwrap(),
                 server_timestamp.try_into().unwrap(),
-                Arc::new(encdec),
+                TEST_ENCRYPTOR_ARC.clone(),
             )
             .unwrap();
         update_plan
@@ -532,7 +530,6 @@ mod tests {
             unknown: None,
         };
 
-        let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
         update_plan
             .plan_three_way_merge(
                 local_login,
@@ -540,7 +537,7 @@ mod tests {
                 upstream_login,
                 server_record_timestamp.try_into().unwrap(),
                 server_timestamp.try_into().unwrap(),
-                Arc::new(encdec),
+                TEST_ENCRYPTOR_ARC.clone(),
             )
             .unwrap();
         update_plan
@@ -604,7 +601,6 @@ mod tests {
             unknown: None,
         };
 
-        let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
         update_plan
             .plan_three_way_merge(
                 local_login,
@@ -612,7 +608,7 @@ mod tests {
                 upstream_login,
                 server_record_timestamp.try_into().unwrap(),
                 server_timestamp.try_into().unwrap(),
-                Arc::new(encdec),
+                TEST_ENCRYPTOR_ARC.clone(),
             )
             .unwrap();
         update_plan

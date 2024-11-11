@@ -89,9 +89,7 @@ impl LoginStore {
         // FIXME: whats an ideomatic way to write this?
         match self.db.lock().get_by_id(id) {
             Ok(result) => match result {
-                Some(enc_login) => enc_login
-                    .decrypt(self.encdec.clone())
-                    .and_then(|login| Ok(Some(login))),
+                Some(enc_login) => enc_login.decrypt(self.encdec.clone()).map(Some),
                 None => Ok(None),
             },
             Err(err) => Err(err),
@@ -193,7 +191,7 @@ impl LoginStore {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::encryption::{test_utils::TestKeyManager, ManagedEncryptorDecryptor};
+    use crate::encryption::test_utils::TEST_ENCRYPTOR_ARC;
     use crate::util;
     use crate::{LoginFields, SecureLoginFields};
     use more_asserts::*;
@@ -208,8 +206,7 @@ mod test {
 
     #[test]
     fn test_general() {
-        let encdec = ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {}));
-        let store = LoginStore::new_in_memory(Arc::new(encdec)).unwrap();
+        let store = LoginStore::new_in_memory(TEST_ENCRYPTOR_ARC.clone()).unwrap();
         let list = store.list().expect("Grabbing Empty list to work");
         assert_eq!(list.len(), 0);
         let start_us = util::system_time_ms_i64(SystemTime::now());

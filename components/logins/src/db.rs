@@ -883,7 +883,7 @@ pub mod test_utils {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::encryption::{test_utils::TestKeyManager, ManagedEncryptorDecryptor};
+    use crate::encryption::test_utils::TEST_ENCRYPTOR_ARC;
     use crate::sync::merge::LocalLogin;
     use crate::SecureLoginFields;
     use std::{thread, time};
@@ -902,15 +902,14 @@ mod tests {
             },
         };
 
-        let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
         let db = LoginDb::open_in_memory().unwrap();
-        db.add(login.clone(), encdec.clone())
+        db.add(login.clone(), TEST_ENCRYPTOR_ARC.clone())
             .expect("should be able to add first login");
 
         // We will reject new logins with the same username value...
         let exp_err = "Invalid login: Login already exists";
         assert_eq!(
-            db.add(login.clone(), encdec.clone())
+            db.add(login.clone(), TEST_ENCRYPTOR_ARC.clone())
                 .unwrap_err()
                 .to_string(),
             exp_err
@@ -918,11 +917,13 @@ mod tests {
 
         // Add one with an empty username - not a dupe.
         login.sec_fields.username = "".to_string();
-        db.add(login.clone(), encdec.clone())
+        db.add(login.clone(), TEST_ENCRYPTOR_ARC.clone())
             .expect("empty login isn't a dupe");
 
         assert_eq!(
-            db.add(login, encdec.clone()).unwrap_err().to_string(),
+            db.add(login, TEST_ENCRYPTOR_ARC.clone())
+                .unwrap_err()
+                .to_string(),
             exp_err
         );
 
@@ -932,7 +933,6 @@ mod tests {
 
     #[test]
     fn test_unicode_submit() {
-        let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
         let db = LoginDb::open_in_memory().unwrap();
         let added = db
             .add(
@@ -949,7 +949,7 @@ mod tests {
                         password: "😍".into(),
                     },
                 },
-                encdec.clone(),
+                TEST_ENCRYPTOR_ARC.clone(),
             )
             .unwrap();
         let fetched = db
@@ -964,14 +964,13 @@ mod tests {
         );
         assert_eq!(fetched.fields.username_field, "😍");
         assert_eq!(fetched.fields.password_field, "😍");
-        let sec_fields = fetched.decrypt_fields(encdec.clone()).unwrap();
+        let sec_fields = fetched.decrypt_fields(TEST_ENCRYPTOR_ARC.clone()).unwrap();
         assert_eq!(sec_fields.username, "😍");
         assert_eq!(sec_fields.password, "😍");
     }
 
     #[test]
     fn test_unicode_realm() {
-        let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
         let db = LoginDb::open_in_memory().unwrap();
         let added = db
             .add(
@@ -987,7 +986,7 @@ mod tests {
                         password: "😍".into(),
                     },
                 },
-                encdec.clone(),
+                TEST_ENCRYPTOR_ARC.clone(),
             )
             .unwrap();
         let fetched = db
@@ -1018,7 +1017,6 @@ mod tests {
         good_queries: Vec<&str>,
         zero_queries: Vec<&str>,
     ) {
-        let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
         let db = LoginDb::open_in_memory().unwrap();
         for h in good.iter().chain(bad.iter()) {
             db.add(
@@ -1033,7 +1031,7 @@ mod tests {
                         ..Default::default()
                     },
                 },
-                encdec.clone(),
+                TEST_ENCRYPTOR_ARC.clone(),
             )
             .unwrap();
         }
@@ -1110,7 +1108,6 @@ mod tests {
 
     #[test]
     fn test_add() {
-        let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
         let db = LoginDb::open_in_memory().unwrap();
         let to_add = LoginEntry {
             fields: LoginFields {
@@ -1123,7 +1120,7 @@ mod tests {
                 password: "test_password".into(),
             },
         };
-        let login = db.add(to_add, encdec.clone()).unwrap();
+        let login = db.add(to_add, TEST_ENCRYPTOR_ARC.clone()).unwrap();
         let login2 = db.get_by_id(&login.record.id).unwrap().unwrap();
 
         assert_eq!(login.fields.origin, login2.fields.origin);
@@ -1133,7 +1130,6 @@ mod tests {
 
     #[test]
     fn test_update() {
-        let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
         let db = LoginDb::open_in_memory().unwrap();
         let login = db
             .add(
@@ -1148,7 +1144,7 @@ mod tests {
                         password: "password1".into(),
                     },
                 },
-                encdec.clone(),
+                TEST_ENCRYPTOR_ARC.clone(),
             )
             .unwrap();
         db.update(
@@ -1164,7 +1160,7 @@ mod tests {
                     password: "password2".into(),
                 },
             },
-            encdec.clone(),
+            TEST_ENCRYPTOR_ARC.clone(),
         )
         .unwrap();
 
@@ -1175,14 +1171,13 @@ mod tests {
             login2.fields.http_realm,
             Some("https://www.example2.com".into())
         );
-        let sec_fields = login2.decrypt_fields(encdec.clone()).unwrap();
+        let sec_fields = login2.decrypt_fields(TEST_ENCRYPTOR_ARC.clone()).unwrap();
         assert_eq!(sec_fields.username, "user2");
         assert_eq!(sec_fields.password, "password2");
     }
 
     #[test]
     fn test_touch() {
-        let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
         let db = LoginDb::open_in_memory().unwrap();
         let login = db
             .add(
@@ -1197,7 +1192,7 @@ mod tests {
                         password: "password1".into(),
                     },
                 },
-                encdec.clone(),
+                TEST_ENCRYPTOR_ARC.clone(),
             )
             .unwrap();
         // Simulate touch happening at another "time"
@@ -1210,7 +1205,6 @@ mod tests {
 
     #[test]
     fn test_delete() {
-        let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
         let db = LoginDb::open_in_memory().unwrap();
         let login = db
             .add(
@@ -1225,7 +1219,7 @@ mod tests {
                         password: "test_password".into(),
                     },
                 },
-                encdec.clone(),
+                TEST_ENCRYPTOR_ARC.clone(),
             )
             .unwrap();
 
@@ -1262,28 +1256,25 @@ mod tests {
         }
 
         fn make_saved_login(db: &LoginDb, username: &str, password: &str) -> Login {
-            let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
-            db.add(make_entry(username, password), encdec.clone())
+            db.add(make_entry(username, password), TEST_ENCRYPTOR_ARC.clone())
                 .unwrap()
-                .decrypt(encdec.clone())
+                .decrypt(TEST_ENCRYPTOR_ARC.clone())
                 .unwrap()
         }
 
         #[test]
         fn test_match() {
-            let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
             let db = LoginDb::open_in_memory().unwrap();
             let login = make_saved_login(&db, "user", "pass");
             assert_eq!(
                 Some(login),
-                db.find_login_to_update(make_entry("user", "pass"), encdec.clone())
+                db.find_login_to_update(make_entry("user", "pass"), TEST_ENCRYPTOR_ARC.clone())
                     .unwrap(),
             );
         }
 
         #[test]
         fn test_non_matches() {
-            let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
             let db = LoginDb::open_in_memory().unwrap();
             // Non-match because the username is different
             make_saved_login(&db, "other-user", "pass");
@@ -1300,7 +1291,7 @@ mod tests {
                         password: "pass".into(),
                     },
                 },
-                encdec.clone(),
+                TEST_ENCRYPTOR_ARC.clone(),
             )
             .unwrap();
             // Non-match because it uses form_action_origin instead of http_realm
@@ -1316,44 +1307,41 @@ mod tests {
                         password: "pass".into(),
                     },
                 },
-                encdec.clone(),
+                TEST_ENCRYPTOR_ARC.clone(),
             )
             .unwrap();
             assert_eq!(
                 None,
-                db.find_login_to_update(make_entry("user", "pass"), encdec.clone())
+                db.find_login_to_update(make_entry("user", "pass"), TEST_ENCRYPTOR_ARC.clone())
                     .unwrap(),
             );
         }
 
         #[test]
         fn test_match_blank_password() {
-            let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
             let db = LoginDb::open_in_memory().unwrap();
             let login = make_saved_login(&db, "", "pass");
             assert_eq!(
                 Some(login),
-                db.find_login_to_update(make_entry("user", "pass"), encdec.clone())
+                db.find_login_to_update(make_entry("user", "pass"), TEST_ENCRYPTOR_ARC.clone())
                     .unwrap(),
             );
         }
 
         #[test]
         fn test_username_match_takes_precedence_over_blank_username() {
-            let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
             let db = LoginDb::open_in_memory().unwrap();
             make_saved_login(&db, "", "pass");
             let username_match = make_saved_login(&db, "user", "pass");
             assert_eq!(
                 Some(username_match),
-                db.find_login_to_update(make_entry("user", "pass"), encdec.clone())
+                db.find_login_to_update(make_entry("user", "pass"), TEST_ENCRYPTOR_ARC.clone())
                     .unwrap(),
             );
         }
 
         #[test]
         fn test_invalid_login() {
-            let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
             let db = LoginDb::open_in_memory().unwrap();
             assert!(db
                 .find_login_to_update(
@@ -1365,29 +1353,29 @@ mod tests {
                         },
                         ..LoginEntry::default()
                     },
-                    encdec.clone()
+                    TEST_ENCRYPTOR_ARC.clone()
                 )
                 .is_err());
         }
 
         #[test]
         fn test_update_with_duplicate_login() {
-            let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
             // If we have duplicate logins in the database, it should be possible to update them
             // without triggering a DuplicateLogin error
             let db = LoginDb::open_in_memory().unwrap();
             let login = make_saved_login(&db, "user", "pass");
-            let mut dupe = login.clone().encrypt(encdec.clone()).unwrap();
+            let mut dupe = login.clone().encrypt(TEST_ENCRYPTOR_ARC.clone()).unwrap();
             dupe.record.id = "different-guid".to_string();
             db.insert_new_login(&dupe).unwrap();
 
             let mut entry = login.entry();
             entry.sec_fields.password = "pass2".to_string();
-            db.update(&login.record.id, entry, encdec.clone()).unwrap();
+            db.update(&login.record.id, entry, TEST_ENCRYPTOR_ARC.clone())
+                .unwrap();
 
             let mut entry = login.entry();
             entry.sec_fields.password = "pass3".to_string();
-            db.add_or_update(entry, encdec.clone()).unwrap();
+            db.add_or_update(entry, TEST_ENCRYPTOR_ARC.clone()).unwrap();
         }
     }
 }

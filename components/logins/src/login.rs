@@ -386,9 +386,7 @@ impl SecureLoginFields {
         let json = encdec
             .decrypt(ciphertext.as_bytes().into(), description.to_owned())
             .unwrap();
-        Ok(serde_json::from_str(
-            std::str::from_utf8(&json).unwrap().into(),
-        )?)
+        Ok(serde_json::from_str(std::str::from_utf8(&json).unwrap())?)
     }
 
     // pub fn encrypt(&self, encdec: &dyn EncryptorDecryptorTrait) -> Result<String> {
