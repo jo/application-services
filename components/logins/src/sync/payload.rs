@@ -27,26 +27,21 @@ trait UnknownFieldsExt {
 }
 
 impl UnknownFieldsExt for UnknownFields {
-    // TODO: FIXME: this is hacky hack
     fn encrypt(&self, encdec: Arc<dyn EncryptorDecryptorTrait>) -> Result<String> {
         let description = "encrypt unknown fields";
         let string = serde_json::to_string(&self)?;
-        Ok(std::str::from_utf8(
-            &encdec
-                .encrypt(string.as_bytes().into(), description.to_owned())
-                .unwrap(),
-        )
-        .unwrap()
-        .into())
+        let cipherbytes = encdec
+            .encrypt(string.as_bytes().into(), description.to_owned())
+            .map_err(|_| Error::EncryptionFailed)?;
+        Ok(std::str::from_utf8(&cipherbytes)?.to_owned())
     }
 
-    // TODO: FIXME: this is hacky hack, too
     fn decrypt(ciphertext: &str, encdec: Arc<dyn EncryptorDecryptorTrait>) -> Result<Self> {
         let description = "decrypt unknown fields";
-        let json = encdec
+        let jsonbytes = encdec
             .decrypt(ciphertext.as_bytes().into(), description.to_owned())
-            .unwrap();
-        Ok(serde_json::from_str(std::str::from_utf8(&json).unwrap())?)
+            .map_err(|_| Error::DecryptionFailed)?;
+        Ok(serde_json::from_str(std::str::from_utf8(&jsonbytes)?)?)
     }
 }
 

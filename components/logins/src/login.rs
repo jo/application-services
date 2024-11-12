@@ -372,19 +372,16 @@ impl SecureLoginFields {
         let string = serde_json::to_string(&self)?;
         let cipherbytes = encdec
             .encrypt(string.as_bytes().into(), description.to_owned())
-            .unwrap();
-        let ciphertext = std::str::from_utf8(&cipherbytes).unwrap();
-        Ok(ciphertext.to_owned())
+            .map_err(|_| Error::EncryptionFailed)?;
+        Ok(std::str::from_utf8(&cipherbytes)?.to_owned())
     }
 
     pub fn decrypt(ciphertext: &str, encdec: Arc<dyn EncryptorDecryptorTrait>) -> Result<Self> {
         let description = "decrypt SecureLoginFields";
         let jsonbytes = encdec
             .decrypt(ciphertext.as_bytes().into(), description.to_owned())
-            .unwrap();
-        let jsonstring = std::str::from_utf8(&jsonbytes).unwrap();
-        let result = serde_json::from_str(jsonstring)?;
-        Ok(result)
+            .map_err(|_| Error::DecryptionFailed)?;
+        Ok(serde_json::from_str(std::str::from_utf8(&jsonbytes)?)?)
     }
 }
 

@@ -29,9 +29,6 @@
 
 use crate::error::*;
 use std::sync::Arc;
-// use serde::{de::DeserializeOwned, Serialize};
-
-pub type EncryptorDecryptor = jwcrypto::EncryptorDecryptor<Error>;
 
 pub trait EncryptorDecryptorTrait: Send + Sync {
     fn encrypt(&self, cleartext: Vec<u8>, description: String) -> ApiResult<Vec<u8>>;
@@ -55,24 +52,31 @@ impl ManagedEncryptorDecryptor {
 impl EncryptorDecryptorTrait for ManagedEncryptorDecryptor {
     #[handle_error(Error)]
     fn encrypt(&self, cleartext: Vec<u8>, description: String) -> ApiResult<Vec<u8>> {
-        let key = self.key_manager.get_key().unwrap();
-        let encdec = EncryptorDecryptor::new(std::str::from_utf8(&key).unwrap())?;
+        let key = self
+            .key_manager
+            .get_key()
+            .map_err(|_| Error::EncryptionKeyMissing)?;
+
+        let encdec = jwcrypto::EncryptorDecryptor::new(std::str::from_utf8(&key)?)?;
         encdec
-            .encrypt(std::str::from_utf8(&cleartext).unwrap(), &description)
+            .encrypt(std::str::from_utf8(&cleartext)?, &description)
             .map(|text| text.into())
     }
 
     #[handle_error(Error)]
     fn decrypt(&self, ciphertext: Vec<u8>, description: String) -> ApiResult<Vec<u8>> {
-        let key = self.key_manager.get_key().unwrap();
-        let encdec = EncryptorDecryptor::new(std::str::from_utf8(&key).unwrap())?;
+        let key = self
+            .key_manager
+            .get_key()
+            .map_err(|_| Error::EncryptionKeyMissing)?;
+        let encdec = jwcrypto::EncryptorDecryptor::new(std::str::from_utf8(&key)?)?;
         encdec
-            .decrypt(std::str::from_utf8(&ciphertext).unwrap(), &description)
+            .decrypt(std::str::from_utf8(&ciphertext)?, &description)
             .map(|text| text.into())
     }
 }
 
-// temporary struct to ease transition
+// StaticKeyManager is temporary struct to ease transition of sync engine merge crypto
 pub struct StaticKeyManager {
     key: String,
 }
@@ -82,6 +86,7 @@ impl StaticKeyManager {
     }
 }
 impl KeyManager for StaticKeyManager {
+    #[handle_error(Error)]
     fn get_key(&self) -> ApiResult<Vec<u8>> {
         Ok(self.key.as_bytes().into())
     }
@@ -89,17 +94,17 @@ impl KeyManager for StaticKeyManager {
 
 #[handle_error(Error)]
 pub fn create_canary(text: &str, key: &str) -> ApiResult<String> {
-    EncryptorDecryptor::new(key)?.create_canary(text)
+    jwcrypto::EncryptorDecryptor::new(key)?.create_canary(text)
 }
 
 #[handle_error(Error)]
 pub fn check_canary(canary: &str, text: &str, key: &str) -> ApiResult<bool> {
-    EncryptorDecryptor::new(key)?.check_canary(canary, text)
+    jwcrypto::EncryptorDecryptor::new(key)?.check_canary(canary, text)
 }
 
 #[handle_error(Error)]
 pub fn create_key() -> ApiResult<String> {
-    EncryptorDecryptor::create_key()
+    jwcrypto::EncryptorDecryptor::create_key()
 }
 
 #[cfg(test)]
@@ -109,7 +114,7 @@ pub mod test_utils {
 
     lazy_static::lazy_static! {
         pub static ref TEST_ENCRYPTION_KEY: String = serde_json::to_string(&jwcrypto::Jwk::new_direct_key(Some("test-key".to_string())).unwrap()).unwrap();
-        pub static ref TEST_ENCRYPTOR: EncryptorDecryptor = EncryptorDecryptor::new(&TEST_ENCRYPTION_KEY).unwrap();
+        pub static ref TEST_ENCRYPTOR: jwcrypto::EncryptorDecryptor = jwcrypto::EncryptorDecryptor::new(&TEST_ENCRYPTION_KEY).unwrap();
     }
 
     pub fn encrypt(value: &str) -> String {
@@ -147,11 +152,11 @@ mod test {
 
     #[test]
     fn test_encrypt() {
-        let ed = EncryptorDecryptor::new(&create_key().unwrap()).unwrap();
+        let ed: jwcrypto::EncryptorDecryptor<Error> = jwcrypto::EncryptorDecryptor::new(&create_key().unwrap()).unwrap();
         let cleartext = "secret";
         let ciphertext = ed.encrypt(cleartext, "test encrypt").unwrap();
         assert_eq!(ed.decrypt(&ciphertext, "test decrypt").unwrap(), cleartext);
-        let ed2 = EncryptorDecryptor::new(&create_key().unwrap()).unwrap();
+        let ed2 = jwcrypto::EncryptorDecryptor::new(&create_key().unwrap()).unwrap();
         assert!(matches!(
             ed2.decrypt(&ciphertext, "test decrypt").err().unwrap(),
             Error::CryptoError(jwcrypto::EncryptorDecryptorError { description, .. })
@@ -161,7 +166,7 @@ mod test {
 
     #[test]
     fn test_key_error() {
-        let storage_err = EncryptorDecryptor::new("bad-key").err().unwrap();
+        let storage_err = jwcrypto::EncryptorDecryptor::new("bad-key").err().unwrap();
         assert!(matches!(
             storage_err,
             Error::CryptoError(jwcrypto::EncryptorDecryptorError {

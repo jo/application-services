@@ -58,11 +58,20 @@ pub enum Error {
     #[error("local encryption key not set")]
     EncryptionKeyMissing,
 
+    #[error("encryption failed")]
+    EncryptionFailed,
+
+    #[error("decryption failed")]
+    DecryptionFailed,
+
     #[error("Error synchronizing: {0}")]
     SyncAdapterError(#[from] sync15::Error),
 
     #[error("Error parsing JSON data: {0}")]
     JsonError(#[from] serde_json::Error),
+
+    #[error("Error constructing UTF8 string: {0}")]
+    Utf8Error(#[from] std::str::Utf8Error),
 
     #[error("Error executing SQL: {0}")]
     SqlError(#[from] rusqlite::Error),

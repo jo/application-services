@@ -9,22 +9,6 @@ namespace logins {
     [Throws=LoginsApiError]
     string create_key();
 
-    /// Decrypt an `EncryptedLogin` to a `Login`
-    [Throws=LoginsApiError]
-    Login decrypt_login(EncryptedLogin login, [ByRef]string encryption_key);
-
-    /// Encrypt a `Login` to an `EncryptedLogin`
-    [Throws=LoginsApiError]
-    EncryptedLogin encrypt_login(Login login, [ByRef]string encryption_key);
-
-    /// Decrypt an encrypted `string` to `SecureLoginFields`
-    [Throws=LoginsApiError]
-    SecureLoginFields decrypt_fields(string sec_fields, [ByRef]string encryption_key);
-
-    /// Encrypt `SecureLoginFields` to an encrypted `string`
-    [Throws=LoginsApiError]
-    string encrypt_fields(SecureLoginFields sec_fields, [ByRef]string encryption_key);
-
     /// Create a "canary" string, which can be used to test if the encryption key is still valid for the logins data
     [Throws=LoginsApiError]
     string create_canary([ByRef]string text, [ByRef]string encryption_key);
