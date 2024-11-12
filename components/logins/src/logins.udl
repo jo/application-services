@@ -93,7 +93,7 @@ interface LoginsApiError {
 
 
 [Trait, WithForeign]
-interface EncryptorDecryptorTrait {
+interface EncryptorDecryptor {
     [Throws=LoginsApiError]
     bytes encrypt(bytes cleartext, string description);
 
@@ -103,7 +103,7 @@ interface EncryptorDecryptorTrait {
 
 interface LoginStore {
     [Throws=LoginsApiError]
-    constructor(string path, EncryptorDecryptorTrait encdec);
+    constructor(string path, EncryptorDecryptor encdec);
 
     [Throws=LoginsApiError]
     Login add(LoginEntry login);

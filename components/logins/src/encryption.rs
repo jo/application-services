@@ -30,7 +30,7 @@
 use crate::error::*;
 use std::sync::Arc;
 
-pub trait EncryptorDecryptorTrait: Send + Sync {
+pub trait EncryptorDecryptor: Send + Sync {
     fn encrypt(&self, cleartext: Vec<u8>, description: String) -> ApiResult<Vec<u8>>;
     fn decrypt(&self, ciphertext: Vec<u8>, description: String) -> ApiResult<Vec<u8>>;
 }
@@ -49,7 +49,7 @@ impl ManagedEncryptorDecryptor {
     }
 }
 
-impl EncryptorDecryptorTrait for ManagedEncryptorDecryptor {
+impl EncryptorDecryptor for ManagedEncryptorDecryptor {
     #[handle_error(Error)]
     fn encrypt(&self, cleartext: Vec<u8>, description: String) -> ApiResult<Vec<u8>> {
         let key = self
@@ -114,27 +114,9 @@ pub mod test_utils {
 
     lazy_static::lazy_static! {
         pub static ref TEST_ENCRYPTION_KEY: String = serde_json::to_string(&jwcrypto::Jwk::new_direct_key(Some("test-key".to_string())).unwrap()).unwrap();
-        pub static ref TEST_ENCRYPTOR: jwcrypto::EncryptorDecryptor = jwcrypto::EncryptorDecryptor::new(&TEST_ENCRYPTION_KEY).unwrap();
     }
 
-    pub fn encrypt(value: &str) -> String {
-        TEST_ENCRYPTOR.encrypt(value, "test encrypt").unwrap()
-    }
-    pub fn decrypt(value: &str) -> String {
-        TEST_ENCRYPTOR.decrypt(value, "test decrypt").unwrap()
-    }
-    pub fn encrypt_struct<T: Serialize>(fields: &T) -> String {
-        TEST_ENCRYPTOR
-            .encrypt_struct(fields, "test encrypt struct")
-            .unwrap()
-    }
-    pub fn decrypt_struct<T: DeserializeOwned>(ciphertext: String) -> T {
-        TEST_ENCRYPTOR
-            .decrypt_struct(&ciphertext, "test decrypt struct")
-            .unwrap()
-    }
-
-    pub struct TestKeyManager {}
+    struct TestKeyManager {}
     impl KeyManager for TestKeyManager {
         fn get_key(&self) -> ApiResult<Vec<u8>> {
             Ok(TEST_ENCRYPTION_KEY.as_bytes().into())
@@ -142,7 +124,26 @@ pub mod test_utils {
     }
 
     lazy_static::lazy_static! {
-        pub static ref TEST_ENCRYPTOR_ARC: Arc<ManagedEncryptorDecryptor> = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
+        pub static ref TEST_ENCDEC: Arc<ManagedEncryptorDecryptor> = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
+    }
+
+    pub fn encrypt_struct<T: Serialize>(fields: &T) -> String {
+        let string = serde_json::to_string(fields).unwrap();
+        let cipherbytes = TEST_ENCDEC
+            .clone()
+            .encrypt(string.as_bytes().into(), "test encrypt struct".to_owned())
+            .unwrap();
+        std::str::from_utf8(&cipherbytes).unwrap().to_owned()
+    }
+    pub fn decrypt_struct<T: DeserializeOwned>(ciphertext: String) -> T {
+        let jsonbytes = TEST_ENCDEC
+            .clone()
+            .decrypt(
+                ciphertext.as_bytes().into(),
+                "test decrypt struct".to_owned(),
+            )
+            .unwrap();
+        serde_json::from_str(std::str::from_utf8(&jsonbytes).unwrap()).unwrap()
     }
 }
 
@@ -152,7 +153,8 @@ mod test {
 
     #[test]
     fn test_encrypt() {
-        let ed: jwcrypto::EncryptorDecryptor<Error> = jwcrypto::EncryptorDecryptor::new(&create_key().unwrap()).unwrap();
+        let ed: jwcrypto::EncryptorDecryptor<Error> =
+            jwcrypto::EncryptorDecryptor::new(&create_key().unwrap()).unwrap();
         let cleartext = "secret";
         let ciphertext = ed.encrypt(cleartext, "test encrypt").unwrap();
         assert_eq!(ed.decrypt(&ciphertext, "test decrypt").unwrap(), cleartext);

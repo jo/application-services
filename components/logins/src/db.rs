@@ -22,7 +22,7 @@
 ///     server.
 ///   - After we sync, we move all records from loginsL to loginsM, overwriting any previous data.
 ///     loginsL will be an empty table after this.  See mark_as_synchronized() for the details.
-use crate::encryption::EncryptorDecryptorTrait;
+use crate::encryption::EncryptorDecryptor;
 use crate::error::*;
 use crate::login::*;
 use crate::schema;
@@ -212,7 +212,7 @@ impl LoginDb {
     pub fn find_login_to_update(
         &self,
         look: LoginEntry,
-        encdec: Arc<dyn EncryptorDecryptorTrait>,
+        encdec: Arc<dyn EncryptorDecryptor>,
     ) -> Result<Option<Login>> {
         let look = look.fixup()?;
         let logins = self
@@ -358,7 +358,7 @@ impl LoginDb {
     pub fn add(
         &self,
         entry: LoginEntry,
-        encdec: Arc<dyn EncryptorDecryptorTrait>,
+        encdec: Arc<dyn EncryptorDecryptor>,
     ) -> Result<EncryptedLogin> {
         let guid = Guid::random();
         let now_ms = util::system_time_ms_i64(SystemTime::now());
@@ -385,7 +385,7 @@ impl LoginDb {
         &self,
         sguid: &str,
         entry: LoginEntry,
-        encdec: Arc<dyn EncryptorDecryptorTrait>,
+        encdec: Arc<dyn EncryptorDecryptor>,
     ) -> Result<EncryptedLogin> {
         let guid = Guid::new(sguid);
         let now_ms = util::system_time_ms_i64(SystemTime::now());
@@ -446,7 +446,7 @@ impl LoginDb {
     pub fn add_or_update(
         &self,
         entry: LoginEntry,
-        encdec: Arc<dyn EncryptorDecryptorTrait>,
+        encdec: Arc<dyn EncryptorDecryptor>,
     ) -> Result<EncryptedLogin> {
         // Make sure to fixup the entry first, in case that changes the username
         let entry = entry.fixup()?;
@@ -460,7 +460,7 @@ impl LoginDb {
         &self,
         guid: &Guid,
         entry: LoginEntry,
-        encdec: Arc<dyn EncryptorDecryptorTrait>,
+        encdec: Arc<dyn EncryptorDecryptor>,
     ) -> Result<LoginEntry> {
         let entry = entry.fixup()?;
         self.check_for_dupes(guid, &entry, encdec)?;
@@ -471,7 +471,7 @@ impl LoginDb {
         &self,
         guid: &Guid,
         entry: &LoginEntry,
-        encdec: Arc<dyn EncryptorDecryptorTrait>,
+        encdec: Arc<dyn EncryptorDecryptor>,
     ) -> Result<()> {
         if self.dupe_exists(guid, entry, encdec)? {
             return Err(InvalidLogin::DuplicateLogin.into());
@@ -483,7 +483,7 @@ impl LoginDb {
         &self,
         guid: &Guid,
         entry: &LoginEntry,
-        encdec: Arc<dyn EncryptorDecryptorTrait>,
+        encdec: Arc<dyn EncryptorDecryptor>,
     ) -> Result<bool> {
         Ok(self.find_dupe(guid, entry, encdec)?.is_some())
     }
@@ -492,7 +492,7 @@ impl LoginDb {
         &self,
         guid: &Guid,
         entry: &LoginEntry,
-        encdec: Arc<dyn EncryptorDecryptorTrait>,
+        encdec: Arc<dyn EncryptorDecryptor>,
     ) -> Result<Option<Guid>> {
         for possible in self.get_by_entry_target(entry)? {
             if possible.guid() != *guid {
@@ -883,7 +883,7 @@ pub mod test_utils {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::encryption::test_utils::TEST_ENCRYPTOR_ARC;
+    use crate::encryption::test_utils::TEST_ENCDEC;
     use crate::sync::merge::LocalLogin;
     use crate::SecureLoginFields;
     use std::{thread, time};
@@ -903,13 +903,13 @@ mod tests {
         };
 
         let db = LoginDb::open_in_memory().unwrap();
-        db.add(login.clone(), TEST_ENCRYPTOR_ARC.clone())
+        db.add(login.clone(), TEST_ENCDEC.clone())
             .expect("should be able to add first login");
 
         // We will reject new logins with the same username value...
         let exp_err = "Invalid login: Login already exists";
         assert_eq!(
-            db.add(login.clone(), TEST_ENCRYPTOR_ARC.clone())
+            db.add(login.clone(), TEST_ENCDEC.clone())
                 .unwrap_err()
                 .to_string(),
             exp_err
@@ -917,11 +917,11 @@ mod tests {
 
         // Add one with an empty username - not a dupe.
         login.sec_fields.username = "".to_string();
-        db.add(login.clone(), TEST_ENCRYPTOR_ARC.clone())
+        db.add(login.clone(), TEST_ENCDEC.clone())
             .expect("empty login isn't a dupe");
 
         assert_eq!(
-            db.add(login, TEST_ENCRYPTOR_ARC.clone())
+            db.add(login, TEST_ENCDEC.clone())
                 .unwrap_err()
                 .to_string(),
             exp_err
@@ -949,7 +949,7 @@ mod tests {
                         password: "😍".into(),
                     },
                 },
-                TEST_ENCRYPTOR_ARC.clone(),
+                TEST_ENCDEC.clone(),
             )
             .unwrap();
         let fetched = db
@@ -964,7 +964,7 @@ mod tests {
         );
         assert_eq!(fetched.fields.username_field, "😍");
         assert_eq!(fetched.fields.password_field, "😍");
-        let sec_fields = fetched.decrypt_fields(TEST_ENCRYPTOR_ARC.clone()).unwrap();
+        let sec_fields = fetched.decrypt_fields(TEST_ENCDEC.clone()).unwrap();
         assert_eq!(sec_fields.username, "😍");
         assert_eq!(sec_fields.password, "😍");
     }
@@ -986,7 +986,7 @@ mod tests {
                         password: "😍".into(),
                     },
                 },
-                TEST_ENCRYPTOR_ARC.clone(),
+                TEST_ENCDEC.clone(),
             )
             .unwrap();
         let fetched = db
@@ -1031,7 +1031,7 @@ mod tests {
                         ..Default::default()
                     },
                 },
-                TEST_ENCRYPTOR_ARC.clone(),
+                TEST_ENCDEC.clone(),
             )
             .unwrap();
         }
@@ -1120,7 +1120,7 @@ mod tests {
                 password: "test_password".into(),
             },
         };
-        let login = db.add(to_add, TEST_ENCRYPTOR_ARC.clone()).unwrap();
+        let login = db.add(to_add, TEST_ENCDEC.clone()).unwrap();
         let login2 = db.get_by_id(&login.record.id).unwrap().unwrap();
 
         assert_eq!(login.fields.origin, login2.fields.origin);
@@ -1144,7 +1144,7 @@ mod tests {
                         password: "password1".into(),
                     },
                 },
-                TEST_ENCRYPTOR_ARC.clone(),
+                TEST_ENCDEC.clone(),
             )
             .unwrap();
         db.update(
@@ -1160,7 +1160,7 @@ mod tests {
                     password: "password2".into(),
                 },
             },
-            TEST_ENCRYPTOR_ARC.clone(),
+            TEST_ENCDEC.clone(),
         )
         .unwrap();
 
@@ -1171,7 +1171,7 @@ mod tests {
             login2.fields.http_realm,
             Some("https://www.example2.com".into())
         );
-        let sec_fields = login2.decrypt_fields(TEST_ENCRYPTOR_ARC.clone()).unwrap();
+        let sec_fields = login2.decrypt_fields(TEST_ENCDEC.clone()).unwrap();
         assert_eq!(sec_fields.username, "user2");
         assert_eq!(sec_fields.password, "password2");
     }
@@ -1192,7 +1192,7 @@ mod tests {
                         password: "password1".into(),
                     },
                 },
-                TEST_ENCRYPTOR_ARC.clone(),
+                TEST_ENCDEC.clone(),
             )
             .unwrap();
         // Simulate touch happening at another "time"
@@ -1219,7 +1219,7 @@ mod tests {
                         password: "test_password".into(),
                     },
                 },
-                TEST_ENCRYPTOR_ARC.clone(),
+                TEST_ENCDEC.clone(),
             )
             .unwrap();
 
@@ -1256,9 +1256,9 @@ mod tests {
         }
 
         fn make_saved_login(db: &LoginDb, username: &str, password: &str) -> Login {
-            db.add(make_entry(username, password), TEST_ENCRYPTOR_ARC.clone())
+            db.add(make_entry(username, password), TEST_ENCDEC.clone())
                 .unwrap()
-                .decrypt(TEST_ENCRYPTOR_ARC.clone())
+                .decrypt(TEST_ENCDEC.clone())
                 .unwrap()
         }
 
@@ -1268,7 +1268,7 @@ mod tests {
             let login = make_saved_login(&db, "user", "pass");
             assert_eq!(
                 Some(login),
-                db.find_login_to_update(make_entry("user", "pass"), TEST_ENCRYPTOR_ARC.clone())
+                db.find_login_to_update(make_entry("user", "pass"), TEST_ENCDEC.clone())
                     .unwrap(),
             );
         }
@@ -1291,7 +1291,7 @@ mod tests {
                         password: "pass".into(),
                     },
                 },
-                TEST_ENCRYPTOR_ARC.clone(),
+                TEST_ENCDEC.clone(),
             )
             .unwrap();
             // Non-match because it uses form_action_origin instead of http_realm
@@ -1307,12 +1307,12 @@ mod tests {
                         password: "pass".into(),
                     },
                 },
-                TEST_ENCRYPTOR_ARC.clone(),
+                TEST_ENCDEC.clone(),
             )
             .unwrap();
             assert_eq!(
                 None,
-                db.find_login_to_update(make_entry("user", "pass"), TEST_ENCRYPTOR_ARC.clone())
+                db.find_login_to_update(make_entry("user", "pass"), TEST_ENCDEC.clone())
                     .unwrap(),
             );
         }
@@ -1323,7 +1323,7 @@ mod tests {
             let login = make_saved_login(&db, "", "pass");
             assert_eq!(
                 Some(login),
-                db.find_login_to_update(make_entry("user", "pass"), TEST_ENCRYPTOR_ARC.clone())
+                db.find_login_to_update(make_entry("user", "pass"), TEST_ENCDEC.clone())
                     .unwrap(),
             );
         }
@@ -1335,7 +1335,7 @@ mod tests {
             let username_match = make_saved_login(&db, "user", "pass");
             assert_eq!(
                 Some(username_match),
-                db.find_login_to_update(make_entry("user", "pass"), TEST_ENCRYPTOR_ARC.clone())
+                db.find_login_to_update(make_entry("user", "pass"), TEST_ENCDEC.clone())
                     .unwrap(),
             );
         }
@@ -1353,7 +1353,7 @@ mod tests {
                         },
                         ..LoginEntry::default()
                     },
-                    TEST_ENCRYPTOR_ARC.clone()
+                    TEST_ENCDEC.clone()
                 )
                 .is_err());
         }
@@ -1364,18 +1364,18 @@ mod tests {
             // without triggering a DuplicateLogin error
             let db = LoginDb::open_in_memory().unwrap();
             let login = make_saved_login(&db, "user", "pass");
-            let mut dupe = login.clone().encrypt(TEST_ENCRYPTOR_ARC.clone()).unwrap();
+            let mut dupe = login.clone().encrypt(TEST_ENCDEC.clone()).unwrap();
             dupe.record.id = "different-guid".to_string();
             db.insert_new_login(&dupe).unwrap();
 
             let mut entry = login.entry();
             entry.sec_fields.password = "pass2".to_string();
-            db.update(&login.record.id, entry, TEST_ENCRYPTOR_ARC.clone())
+            db.update(&login.record.id, entry, TEST_ENCDEC.clone())
                 .unwrap();
 
             let mut entry = login.entry();
             entry.sec_fields.password = "pass3".to_string();
-            db.add_or_update(entry, TEST_ENCRYPTOR_ARC.clone()).unwrap();
+            db.add_or_update(entry, TEST_ENCDEC.clone()).unwrap();
         }
     }
 }

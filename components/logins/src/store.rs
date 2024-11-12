@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 use crate::db::LoginDb;
-use crate::encryption::EncryptorDecryptorTrait;
+use crate::encryption::EncryptorDecryptor;
 use crate::error::*;
 use crate::login::{Login, LoginEntry};
 use crate::LoginsSyncEngine;
@@ -48,20 +48,17 @@ fn create_sync_engine(
 
 pub struct LoginStore {
     pub db: Mutex<LoginDb>,
-    encdec: Arc<dyn EncryptorDecryptorTrait>,
+    encdec: Arc<dyn EncryptorDecryptor>,
 }
 
 impl LoginStore {
     #[handle_error(Error)]
-    pub fn new(
-        path: impl AsRef<Path>,
-        encdec: Arc<dyn EncryptorDecryptorTrait>,
-    ) -> ApiResult<Self> {
+    pub fn new(path: impl AsRef<Path>, encdec: Arc<dyn EncryptorDecryptor>) -> ApiResult<Self> {
         let db = Mutex::new(LoginDb::open(path)?);
         Ok(Self { db, encdec })
     }
 
-    pub fn new_from_db(db: LoginDb, encdec: Arc<dyn EncryptorDecryptorTrait>) -> Self {
+    pub fn new_from_db(db: LoginDb, encdec: Arc<dyn EncryptorDecryptor>) -> Self {
         Self {
             db: Mutex::new(db),
             encdec,
@@ -69,7 +66,7 @@ impl LoginStore {
     }
 
     #[handle_error(Error)]
-    pub fn new_in_memory(encdec: Arc<dyn EncryptorDecryptorTrait>) -> ApiResult<Self> {
+    pub fn new_in_memory(encdec: Arc<dyn EncryptorDecryptor>) -> ApiResult<Self> {
         let db = Mutex::new(LoginDb::open_in_memory()?);
         Ok(Self { db, encdec })
     }
@@ -190,7 +187,7 @@ impl LoginStore {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::encryption::test_utils::TEST_ENCRYPTOR_ARC;
+    use crate::encryption::test_utils::TEST_ENCDEC;
     use crate::util;
     use crate::{LoginFields, SecureLoginFields};
     use more_asserts::*;
@@ -205,7 +202,7 @@ mod test {
 
     #[test]
     fn test_general() {
-        let store = LoginStore::new_in_memory(TEST_ENCRYPTOR_ARC.clone()).unwrap();
+        let store = LoginStore::new_in_memory(TEST_ENCDEC.clone()).unwrap();
         let list = store.list().expect("Grabbing Empty list to work");
         assert_eq!(list.len(), 0);
         let start_us = util::system_time_ms_i64(SystemTime::now());
@@ -319,7 +316,7 @@ mod test {
 
     #[test]
     fn test_sync_manager_registration() {
-        let store = Arc::new(LoginStore::new_in_memory(TEST_ENCRYPTOR_ARC.clone()).unwrap());
+        let store = Arc::new(LoginStore::new_in_memory(TEST_ENCDEC.clone()).unwrap());
         assert_eq!(Arc::strong_count(&store), 1);
         assert_eq!(Arc::weak_count(&store), 0);
         Arc::clone(&store).register_with_sync_manager();

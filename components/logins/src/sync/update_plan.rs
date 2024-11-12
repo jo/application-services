@@ -4,7 +4,7 @@
 
 use super::merge::{LocalLogin, MirrorLogin};
 use super::{IncomingLogin, SyncStatus};
-use crate::encryption::EncryptorDecryptorTrait;
+use crate::encryption::EncryptorDecryptor;
 use crate::error::*;
 use crate::util;
 use interrupt_support::SqlInterruptScope;
@@ -55,7 +55,7 @@ impl UpdatePlan {
         upstream: IncomingLogin,
         upstream_time: ServerTimestamp,
         server_now: ServerTimestamp,
-        encdec: Arc<dyn EncryptorDecryptorTrait>,
+        encdec: Arc<dyn EncryptorDecryptor>,
     ) -> Result<()> {
         let local_age = SystemTime::now()
             .duration_since(local.local_modified())
@@ -324,7 +324,7 @@ mod tests {
         get_server_modified, insert_encrypted_login, insert_login,
     };
     use crate::db::LoginDb;
-    use crate::encryption::test_utils::TEST_ENCRYPTOR_ARC;
+    use crate::encryption::test_utils::TEST_ENCDEC;
     use crate::login::test_utils::enc_login;
 
     fn inc_login(id: &str, password: &str) -> crate::sync::IncomingLogin {
@@ -471,7 +471,7 @@ mod tests {
                 upstream_login,
                 server_record_timestamp.try_into().unwrap(),
                 server_timestamp.try_into().unwrap(),
-                TEST_ENCRYPTOR_ARC.clone(),
+                TEST_ENCDEC.clone(),
             )
             .unwrap();
         update_plan
@@ -537,7 +537,7 @@ mod tests {
                 upstream_login,
                 server_record_timestamp.try_into().unwrap(),
                 server_timestamp.try_into().unwrap(),
-                TEST_ENCRYPTOR_ARC.clone(),
+                TEST_ENCDEC.clone(),
             )
             .unwrap();
         update_plan
@@ -608,7 +608,7 @@ mod tests {
                 upstream_login,
                 server_record_timestamp.try_into().unwrap(),
                 server_timestamp.try_into().unwrap(),
-                TEST_ENCRYPTOR_ARC.clone(),
+                TEST_ENCDEC.clone(),
             )
             .unwrap();
         update_plan
