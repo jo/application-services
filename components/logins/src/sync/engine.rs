@@ -510,7 +510,7 @@ impl SyncEngine for LoginsSyncEngine {
 mod tests {
     use super::*;
     use crate::db::test_utils::insert_login;
-    use crate::encryption::test_utils::{TEST_ENCRYPTION_KEY, TEST_ENCDEC};
+    use crate::encryption::test_utils::{TEST_ENCDEC, TEST_ENCRYPTION_KEY};
     use crate::login::test_utils::enc_login;
     use crate::{LoginEntry, LoginFields, RecordFields, SecureLoginFields};
     use std::collections::HashMap;
@@ -586,10 +586,7 @@ mod tests {
                         let LocalLogin::Alive { login, .. } = local_login else {
                             unreachable!("this test is not expecting a tombstone");
                         };
-                        login
-                            .decrypt_fields(TEST_ENCDEC.clone())
-                            .unwrap()
-                            .password
+                        login.decrypt_fields(TEST_ENCDEC.clone()).unwrap().password
                     }),
                     mirror: sync_login_data.mirror.map(|mirror_login| {
                         guids_seen.insert(mirror_login.login.record.id.clone());

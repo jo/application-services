@@ -921,9 +921,7 @@ mod tests {
             .expect("empty login isn't a dupe");
 
         assert_eq!(
-            db.add(login, TEST_ENCDEC.clone())
-                .unwrap_err()
-                .to_string(),
+            db.add(login, TEST_ENCDEC.clone()).unwrap_err().to_string(),
             exp_err
         );
 
