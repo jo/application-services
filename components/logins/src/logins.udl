@@ -56,15 +56,6 @@ dictionary Login {
     SecureLoginFields sec_fields;
 };
 
-/// An encrypted version of [Login].  This is what we return for all the "read"
-/// APIs - we never return the cleartext of encrypted fields.
-dictionary EncryptedLogin {
-    RecordFields record;
-    LoginFields fields;
-    /// ciphertext of a SecureLoginFields
-    string sec_fields;
-};
-
 /// These are the errors returned by our public API.
 [Error]
 interface LoginsApiError {
@@ -91,7 +82,6 @@ interface LoginsApiError {
     UnexpectedLoginsApiError(string reason);
 };
 
-
 [Trait, WithForeign]
 interface EncryptorDecryptor {
     [Throws=LoginsApiError]
@@ -99,6 +89,16 @@ interface EncryptorDecryptor {
 
     [Throws=LoginsApiError]
     bytes decrypt(bytes ciphertext, string description);
+};
+
+[Trait, WithForeign]
+interface KeyManager {
+    [Throws=LoginsApiError]
+    bytes get_key();
+};
+
+interface ManagedEncryptorDecryptor {
+    constructor(KeyManager key_manager);
 };
 
 interface LoginStore {
