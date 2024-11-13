@@ -48,7 +48,7 @@ fn create_sync_engine(
 
 pub struct LoginStore {
     pub db: Mutex<LoginDb>,
-    encdec: Arc<dyn EncryptorDecryptor>,
+    pub encdec: Arc<dyn EncryptorDecryptor>,
 }
 
 impl LoginStore {
