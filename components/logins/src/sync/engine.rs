@@ -253,7 +253,8 @@ impl LoginsSyncEngine {
                 OutgoingBso::new_tombstone(envelope)
             } else {
                 let unknown = row.get::<_, Option<String>>("enc_unknown_fields")?;
-                let mut bso = EncryptedLogin::from_row(row)?.into_bso(self.store.encdec.clone(), unknown)?;
+                let mut bso =
+                    EncryptedLogin::from_row(row)?.into_bso(self.store.encdec.clone(), unknown)?;
                 bso.envelope.sortindex = Some(DEFAULT_SORTINDEX);
                 bso
             })

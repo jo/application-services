@@ -78,7 +78,7 @@ impl EncryptorDecryptor for ManagedEncryptorDecryptor {
 
 // StaticKeyManager is temporary struct to ease transition of sync engine merge crypto
 pub struct StaticKeyManager {
-    key: String,
+    pub key: String,
 }
 impl StaticKeyManager {
     pub fn new(key: String) -> Self {

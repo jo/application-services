@@ -10,9 +10,9 @@ use cli_support::fxa_creds::{
     get_account_and_token, get_cli_fxa, get_default_fxa_config, SYNC_SCOPE,
 };
 use cli_support::prompt::{prompt_char, prompt_string, prompt_usize};
-use logins::encryption::{create_key, KeyManager, ManagedEncryptorDecryptor};
+use logins::encryption::{create_key, ManagedEncryptorDecryptor, StaticKeyManager};
 use logins::{
-    ApiResult, Login, LoginEntry, LoginFields, LoginStore, LoginsSyncEngine, SecureLoginFields,
+    Login, LoginEntry, LoginFields, LoginStore, LoginsSyncEngine, SecureLoginFields,
     ValidateAndFixup,
 };
 
@@ -281,19 +281,10 @@ fn prompt_record_id(s: &LoginStore, action: &str) -> Result<Option<String>> {
     Ok(Some(index_to_id[input].as_str().into()))
 }
 
-struct MyKeyManager {
-    encryption_key: String,
-}
-impl KeyManager for MyKeyManager {
-    fn get_key(&self) -> ApiResult<Vec<u8>> {
-        Ok(self.encryption_key.as_bytes().into())
-    }
-}
-
 fn open_database(db_path: &str) -> Result<(LoginStore, String)> {
     let encryption_key = get_or_create_encryption_key()?;
-    let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(MyKeyManager {
-        encryption_key: encryption_key.clone(),
+    let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(StaticKeyManager {
+        key: encryption_key.clone(),
     })));
     let store = LoginStore::new(db_path, encdec)?;
     Ok((store, encryption_key))
