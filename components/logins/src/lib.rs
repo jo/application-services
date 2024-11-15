@@ -16,7 +16,9 @@ mod store;
 mod sync;
 mod util;
 
-use crate::encryption::{EncryptorDecryptor, KeyManager, ManagedEncryptorDecryptor};
+use crate::encryption::{
+    EncryptorDecryptor, KeyManager, ManagedEncryptorDecryptor, StaticKeyManager,
+};
 uniffi::include_scaffolding!("logins");
 
 pub use crate::db::LoginDb;

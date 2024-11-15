@@ -97,6 +97,10 @@ interface KeyManager {
     bytes get_key();
 };
 
+interface StaticKeyManager {
+    constructor(string encryption_key);
+};
+
 interface ManagedEncryptorDecryptor {
     constructor(KeyManager key_manager);
 };
