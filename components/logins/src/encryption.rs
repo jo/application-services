@@ -76,7 +76,6 @@ impl EncryptorDecryptor for ManagedEncryptorDecryptor {
     }
 }
 
-// StaticKeyManager is temporary struct to ease transition of sync engine merge crypto
 pub struct StaticKeyManager {
     pub key: String,
 }
@@ -116,15 +115,8 @@ pub mod test_utils {
         pub static ref TEST_ENCRYPTION_KEY: String = serde_json::to_string(&jwcrypto::Jwk::new_direct_key(Some("test-key".to_string())).unwrap()).unwrap();
     }
 
-    struct TestKeyManager {}
-    impl KeyManager for TestKeyManager {
-        fn get_key(&self) -> ApiResult<Vec<u8>> {
-            Ok(TEST_ENCRYPTION_KEY.as_bytes().into())
-        }
-    }
-
     lazy_static::lazy_static! {
-        pub static ref TEST_ENCDEC: Arc<ManagedEncryptorDecryptor> = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(TestKeyManager {})));
+        pub static ref TEST_ENCDEC: Arc<ManagedEncryptorDecryptor> = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(StaticKeyManager { key: TEST_ENCRYPTION_KEY.clone() })));
     }
 
     pub fn encrypt_struct<T: Serialize>(fields: &T) -> String {
