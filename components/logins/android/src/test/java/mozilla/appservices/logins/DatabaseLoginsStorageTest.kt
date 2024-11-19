@@ -32,13 +32,15 @@ class DatabaseLoginsStorageTest {
     @get:Rule
     val gleanRule = GleanTestRule(ApplicationProvider.getApplicationContext())
 
+    protected val encryptionKey = createKey()
+
     fun createTestStore(): DatabaseLoginsStorage {
         Megazord.init()
         val dbPath = dbFolder.newFile()
-        return DatabaseLoginsStorage(dbPath = dbPath.absolutePath)
+        val keyManager = StaticKeyManager(key = encryptionKey)
+        val encdec = ManagedEncryptorDecryptor(keyManager)
+        return DatabaseLoginsStorage(dbPath = dbPath.absolutePath, encdec)
     }
-
-    protected val encryptionKey = createKey()
 
     protected fun getTestStore(): DatabaseLoginsStorage {
         val store = createTestStore()
@@ -57,7 +59,6 @@ class DatabaseLoginsStorageTest {
                     password = "hunter2",
                 ),
             ),
-            encryptionKey,
         )
 
         store.add(
@@ -74,7 +75,6 @@ class DatabaseLoginsStorageTest {
                     username = "Foobar2000",
                 ),
             ),
-            encryptionKey,
         )
 
         return store
@@ -106,7 +106,6 @@ class DatabaseLoginsStorageTest {
                     password = "hunter2",
                 ),
             ),
-            encryptionKey,
         )
 
         assertEquals(LoginsStoreMetrics.writeQueryCount.testGetValue(), 1)
@@ -128,7 +127,7 @@ class DatabaseLoginsStorageTest {
         )
 
         try {
-            store.add(invalid, encryptionKey)
+            store.add(invalid)
             fail("Should have thrown")
         } catch (e: LoginsApiException.InvalidRecord) {
             // All good.
