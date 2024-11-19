@@ -98,7 +98,7 @@ interface KeyManager {
 };
 
 interface StaticKeyManager {
-    constructor(string encryption_key);
+    constructor(string key);
 };
 
 interface ManagedEncryptorDecryptor {
