@@ -144,17 +144,38 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_encrypt() {
-        let ed: jwcrypto::EncryptorDecryptor<Error> =
-            jwcrypto::EncryptorDecryptor::new(&create_key().unwrap()).unwrap();
+    fn test_static_key_manager() {
+        let key = create_key().unwrap();
+        let key_manager = StaticKeyManager { key: key.clone() };
+        assert_eq!(key.as_bytes(), key_manager.get_key().unwrap());
+    }
+
+    #[test]
+    fn test_managed_encdec() {
+        let key = create_key().unwrap();
+        let key_manager = Arc::new(StaticKeyManager { key });
+        let encdec = ManagedEncryptorDecryptor { key_manager };
         let cleartext = "secret";
-        let ciphertext = ed.encrypt(cleartext, "test encrypt").unwrap();
-        assert_eq!(ed.decrypt(&ciphertext, "test decrypt").unwrap(), cleartext);
-        let ed2 = jwcrypto::EncryptorDecryptor::new(&create_key().unwrap()).unwrap();
+        let ciphertext = encdec
+            .encrypt(cleartext.as_bytes().into(), "test encrypt".to_owned())
+            .unwrap();
+        assert_eq!(
+            encdec
+                .decrypt(ciphertext.clone(), "test encrypt".to_owned())
+                .unwrap(),
+            cleartext.as_bytes()
+        );
+        let other_encdec = ManagedEncryptorDecryptor {
+            key_manager: Arc::new(StaticKeyManager {
+                key: create_key().unwrap(),
+            }),
+        };
         assert!(matches!(
-            ed2.decrypt(&ciphertext, "test decrypt").err().unwrap(),
-            Error::CryptoError(jwcrypto::EncryptorDecryptorError { description, .. })
-            if description == "test decrypt"
+            other_encdec
+                .decrypt(ciphertext, "test decrypt".to_owned())
+                .err()
+                .unwrap(),
+            LoginsApiError::IncorrectKey
         ));
     }
 
