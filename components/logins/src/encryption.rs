@@ -35,9 +35,25 @@ pub trait EncryptorDecryptor: Send + Sync {
     fn decrypt(&self, ciphertext: Vec<u8>, description: String) -> ApiResult<Vec<u8>>;
 }
 
+impl<T: EncryptorDecryptor> EncryptorDecryptor for Arc<T> {
+    fn encrypt(&self, cleartext: Vec<u8>, description: String) -> ApiResult<Vec<u8>> {
+        (&**self).encrypt(cleartext, description)
+    }
+
+    fn decrypt(&self, ciphertext: Vec<u8>, description: String) -> ApiResult<Vec<u8>> {
+        (&**self).decrypt(ciphertext, description)
+    }
+}
+
 pub trait KeyManager: Send + Sync {
     fn get_key(&self) -> ApiResult<Vec<u8>>;
 }
+
+// impl<T: KeyManager> KeyManager for Arc<T> {
+//     fn get_key(&self) -> ApiResult<Vec<u8>> {
+//         (&**self).get_key()
+//     }
+// }
 
 pub struct ManagedEncryptorDecryptor {
     key_manager: Arc<dyn KeyManager>,
@@ -113,9 +129,6 @@ pub mod test_utils {
 
     lazy_static::lazy_static! {
         pub static ref TEST_ENCRYPTION_KEY: String = serde_json::to_string(&jwcrypto::Jwk::new_direct_key(Some("test-key".to_string())).unwrap()).unwrap();
-    }
-
-    lazy_static::lazy_static! {
         pub static ref TEST_ENCDEC: Arc<ManagedEncryptorDecryptor> = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(StaticKeyManager { key: TEST_ENCRYPTION_KEY.clone() })));
     }
 

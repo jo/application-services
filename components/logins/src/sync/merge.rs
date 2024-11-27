@@ -9,7 +9,6 @@ use crate::error::*;
 use crate::login::EncryptedLogin;
 use crate::util;
 use rusqlite::Row;
-use std::sync::Arc;
 use std::time::SystemTime;
 use sync15::bso::{IncomingBso, IncomingKind};
 use sync15::ServerTimestamp;
@@ -145,7 +144,7 @@ impl SyncLoginData {
         &self.guid
     }
 
-    pub fn from_bso(bso: IncomingBso, encdec: Arc<dyn EncryptorDecryptor>) -> Result<Self> {
+    pub fn from_bso(bso: IncomingBso, encdec: &dyn EncryptorDecryptor) -> Result<Self> {
         let guid = bso.envelope.id.clone();
         let inbound_ts = bso.envelope.modified;
         let inbound = match bso.into_content::<LoginPayload>().kind {
@@ -280,7 +279,7 @@ impl EncryptedLogin {
     pub(crate) fn apply_delta(
         &mut self,
         mut delta: LoginDelta,
-        encdec: Arc<dyn EncryptorDecryptor>,
+        encdec: &dyn EncryptorDecryptor,
     ) -> Result<()> {
         apply_field!(self, delta, origin);
 
@@ -316,7 +315,7 @@ impl EncryptedLogin {
     pub(crate) fn delta(
         &self,
         older: &EncryptedLogin,
-        encdec: Arc<dyn EncryptorDecryptor>,
+        encdec: &dyn EncryptorDecryptor,
     ) -> Result<LoginDelta> {
         let mut delta = LoginDelta::default();
 
@@ -397,7 +396,7 @@ mod tests {
             "timeLastUsed": "some other garbage",
             "timePasswordChanged": -30, // valid i64 but negative
         }));
-        let login = SyncLoginData::from_bso(bad_payload, TEST_ENCDEC.clone())
+        let login = SyncLoginData::from_bso(bad_payload, &*TEST_ENCDEC)
             .unwrap()
             .inbound
             .unwrap()
@@ -418,7 +417,7 @@ mod tests {
             "timePasswordChanged": now64 - 25,
         }));
 
-        let login = SyncLoginData::from_bso(good_payload, TEST_ENCDEC.clone())
+        let login = SyncLoginData::from_bso(good_payload, &*TEST_ENCDEC)
             .unwrap()
             .inbound
             .unwrap()

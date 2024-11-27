@@ -9,7 +9,6 @@ use crate::error::*;
 use crate::util;
 use interrupt_support::SqlInterruptScope;
 use rusqlite::{named_params, Connection};
-use std::sync::Arc;
 use std::time::SystemTime;
 use sync15::ServerTimestamp;
 use sync_guid::Guid;
@@ -55,7 +54,7 @@ impl UpdatePlan {
         upstream: IncomingLogin,
         upstream_time: ServerTimestamp,
         server_now: ServerTimestamp,
-        encdec: Arc<dyn EncryptorDecryptor>,
+        encdec: &dyn EncryptorDecryptor,
     ) -> Result<()> {
         let local_age = SystemTime::now()
             .duration_since(local.local_modified())
@@ -471,7 +470,7 @@ mod tests {
                 upstream_login,
                 server_record_timestamp.try_into().unwrap(),
                 server_timestamp.try_into().unwrap(),
-                TEST_ENCDEC.clone(),
+                &*TEST_ENCDEC,
             )
             .unwrap();
         update_plan
@@ -537,7 +536,7 @@ mod tests {
                 upstream_login,
                 server_record_timestamp.try_into().unwrap(),
                 server_timestamp.try_into().unwrap(),
-                TEST_ENCDEC.clone(),
+                &*TEST_ENCDEC,
             )
             .unwrap();
         update_plan
@@ -608,7 +607,7 @@ mod tests {
                 upstream_login,
                 server_record_timestamp.try_into().unwrap(),
                 server_timestamp.try_into().unwrap(),
-                TEST_ENCDEC.clone(),
+                &*TEST_ENCDEC,
             )
             .unwrap();
         update_plan

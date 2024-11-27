@@ -76,7 +76,7 @@ impl LoginStore {
         self.db.lock().get_all().and_then(|logins| {
             logins
                 .into_iter()
-                .map(|login| login.decrypt(self.encdec.clone()))
+                .map(|login| login.decrypt(&self.encdec))
                 .collect()
         })
     }
@@ -85,7 +85,7 @@ impl LoginStore {
     pub fn get(&self, id: &str) -> ApiResult<Option<Login>> {
         match self.db.lock().get_by_id(id) {
             Ok(result) => match result {
-                Some(enc_login) => enc_login.decrypt(self.encdec.clone()).map(Some),
+                Some(enc_login) => enc_login.decrypt(&self.encdec).map(Some),
                 None => Ok(None),
             },
             Err(err) => Err(err),
@@ -100,7 +100,7 @@ impl LoginStore {
             .and_then(|logins| {
                 logins
                     .into_iter()
-                    .map(|login| login.decrypt(self.encdec.clone()))
+                    .map(|login| login.decrypt(&self.encdec))
                     .collect()
             })
     }
@@ -109,7 +109,7 @@ impl LoginStore {
     pub fn find_login_to_update(&self, entry: LoginEntry) -> ApiResult<Option<Login>> {
         self.db
             .lock()
-            .find_login_to_update(entry, self.encdec.clone())
+            .find_login_to_update(entry, &self.encdec)
     }
 
     #[handle_error(Error)]
@@ -142,24 +142,24 @@ impl LoginStore {
     pub fn update(&self, id: &str, entry: LoginEntry) -> ApiResult<Login> {
         self.db
             .lock()
-            .update(id, entry, self.encdec.clone())
-            .and_then(|enc_login| enc_login.decrypt(self.encdec.clone()))
+            .update(id, entry, &self.encdec)
+            .and_then(|enc_login| enc_login.decrypt(&self.encdec))
     }
 
     #[handle_error(Error)]
     pub fn add(&self, entry: LoginEntry) -> ApiResult<Login> {
         self.db
             .lock()
-            .add(entry, self.encdec.clone())
-            .and_then(|enc_login| enc_login.decrypt(self.encdec.clone()))
+            .add(entry, &self.encdec)
+            .and_then(|enc_login| enc_login.decrypt(&self.encdec))
     }
 
     #[handle_error(Error)]
     pub fn add_or_update(&self, entry: LoginEntry) -> ApiResult<Login> {
         self.db
             .lock()
-            .add_or_update(entry, self.encdec.clone())
-            .and_then(|enc_login| enc_login.decrypt(self.encdec.clone()))
+            .add_or_update(entry, &self.encdec)
+            .and_then(|enc_login| enc_login.decrypt(&self.encdec))
     }
 
     // This allows the embedding app to say "make this instance available to

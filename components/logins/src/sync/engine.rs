@@ -69,7 +69,7 @@ impl LoginsSyncEngine {
                         upstream,
                         upstream_time,
                         server_now,
-                        self.store.encdec.clone(),
+                        &self.store.encdec,
                     )?;
                     telem.reconciled(1);
                 }
@@ -132,7 +132,7 @@ impl LoginsSyncEngine {
             let mut seen_ids: HashSet<Guid> = HashSet::with_capacity(records.len());
             for incoming in records.into_iter() {
                 let id = incoming.envelope.id.clone();
-                match SyncLoginData::from_bso(incoming, self.store.encdec.clone()) {
+                match SyncLoginData::from_bso(incoming, &self.store.encdec) {
                     Ok(v) => sync_data.push(v),
                     Err(e) => {
                         match e {
@@ -254,7 +254,7 @@ impl LoginsSyncEngine {
             } else {
                 let unknown = row.get::<_, Option<String>>("enc_unknown_fields")?;
                 let mut bso =
-                    EncryptedLogin::from_row(row)?.into_bso(self.store.encdec.clone(), unknown)?;
+                    EncryptedLogin::from_row(row)?.into_bso(&self.store.encdec, unknown)?;
                 bso.envelope.sortindex = Some(DEFAULT_SORTINDEX);
                 bso
             })
@@ -386,7 +386,7 @@ impl LoginsSyncEngine {
             .form_action_origin
             .as_ref()
             .and_then(|s| util::url_host_port(s));
-        let enc_fields = l.decrypt_fields(self.store.encdec.clone())?;
+        let enc_fields = l.decrypt_fields(&self.store.encdec)?;
         let args = named_params! {
             ":origin": l.fields.origin,
             ":http_realm": l.fields.http_realm,
@@ -411,7 +411,7 @@ impl LoginsSyncEngine {
             .query_and_then(args, EncryptedLogin::from_row)?
             .collect::<Result<Vec<EncryptedLogin>>>()?
         {
-            let this_enc_fields = login.decrypt_fields(self.store.encdec.clone())?;
+            let this_enc_fields = login.decrypt_fields(&self.store.encdec)?;
             if enc_fields.username == this_enc_fields.username {
                 return Ok(Some(login));
             }
@@ -530,15 +530,15 @@ mod tests {
             vec![
                 IncomingBso::new_test_tombstone(Guid::new("deleted_remotely")),
                 enc_login("added_remotely", "password")
-                    .into_bso(TEST_ENCDEC.clone(), None)
+                    .into_bso(&*TEST_ENCDEC, None)
                     .unwrap()
                     .to_test_incoming(),
                 enc_login("updated_remotely", "new-password")
-                    .into_bso(TEST_ENCDEC.clone(), None)
+                    .into_bso(&*TEST_ENCDEC, None)
                     .unwrap()
                     .to_test_incoming(),
                 enc_login("three_way_merge", "new-remote-password")
-                    .into_bso(TEST_ENCDEC.clone(), None)
+                    .into_bso(&*TEST_ENCDEC, None)
                     .unwrap()
                     .to_test_incoming(),
             ],
@@ -560,13 +560,13 @@ mod tests {
                         let LocalLogin::Alive { login, .. } = local_login else {
                             unreachable!("this test is not expecting a tombstone");
                         };
-                        login.decrypt_fields(TEST_ENCDEC.clone()).unwrap().password
+                        login.decrypt_fields(&*TEST_ENCDEC).unwrap().password
                     }),
                     mirror: sync_login_data.mirror.map(|mirror_login| {
                         guids_seen.insert(mirror_login.login.record.id.clone());
                         mirror_login
                             .login
-                            .decrypt_fields(TEST_ENCDEC.clone())
+                            .decrypt_fields(&*TEST_ENCDEC)
                             .unwrap()
                             .password
                     }),
@@ -574,7 +574,7 @@ mod tests {
                         guids_seen.insert(incoming.login.record.id.clone());
                         incoming
                             .login
-                            .decrypt_fields(TEST_ENCDEC.clone())
+                            .decrypt_fields(&*TEST_ENCDEC)
                             .unwrap()
                             .password
                     }),
@@ -709,7 +709,7 @@ mod tests {
                 username: username.into(),
                 password: password.into(),
             }
-            .encrypt(TEST_ENCDEC.clone())
+            .encrypt(&*TEST_ENCDEC)
             .unwrap(),
         }
     }

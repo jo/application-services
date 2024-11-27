@@ -281,7 +281,6 @@
 use crate::{encryption::EncryptorDecryptor, error::*};
 use rusqlite::Row;
 use serde_derive::*;
-use std::sync::Arc;
 use sync_guid::Guid;
 use url::Url;
 
@@ -367,7 +366,7 @@ pub struct SecureLoginFields {
 }
 
 impl SecureLoginFields {
-    pub fn encrypt(&self, encdec: Arc<dyn EncryptorDecryptor>) -> Result<String> {
+    pub fn encrypt(&self, encdec: &dyn EncryptorDecryptor) -> Result<String> {
         let description = "encrypt SecureLoginFields";
         let string = serde_json::to_string(&self)?;
         let cipherbytes = encdec
@@ -376,7 +375,7 @@ impl SecureLoginFields {
         Ok(std::str::from_utf8(&cipherbytes)?.to_owned())
     }
 
-    pub fn decrypt(ciphertext: &str, encdec: Arc<dyn EncryptorDecryptor>) -> Result<Self> {
+    pub fn decrypt(ciphertext: &str, encdec: &dyn EncryptorDecryptor) -> Result<Self> {
         let description = "decrypt SecureLoginFields";
         let jsonbytes = encdec
             .decrypt(ciphertext.as_bytes().into(), description.to_owned())
@@ -423,7 +422,7 @@ impl Login {
         }
     }
 
-    pub fn encrypt(self, encdec: Arc<dyn EncryptorDecryptor>) -> Result<EncryptedLogin> {
+    pub fn encrypt(self, encdec: &dyn EncryptorDecryptor) -> Result<EncryptedLogin> {
         Ok(EncryptedLogin {
             record: self.record,
             fields: self.fields,
@@ -452,7 +451,7 @@ impl EncryptedLogin {
         &self.record.id
     }
 
-    pub fn decrypt(self, encdec: Arc<dyn EncryptorDecryptor>) -> Result<Login> {
+    pub fn decrypt(self, encdec: &dyn EncryptorDecryptor) -> Result<Login> {
         Ok(Login {
             record: self.record,
             fields: self.fields,
@@ -460,7 +459,7 @@ impl EncryptedLogin {
         })
     }
 
-    pub fn decrypt_fields(&self, encdec: Arc<dyn EncryptorDecryptor>) -> Result<SecureLoginFields> {
+    pub fn decrypt_fields(&self, encdec: &dyn EncryptorDecryptor) -> Result<SecureLoginFields> {
         SecureLoginFields::decrypt(&self.sec_fields, encdec)
     }
 
