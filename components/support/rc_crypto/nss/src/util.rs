@@ -6,11 +6,20 @@ use crate::error::*;
 use nss_sys::*;
 use std::{ffi::CString, os::raw::c_char, sync::Once};
 
+#[cfg(feature = "keydb")]
+use crate::pk11::slot;
+#[cfg(feature = "keydb")]
+use std::fs;
+#[cfg(feature = "keydb")]
+use std::path::Path;
+
 // This is the NSS version that this crate is claiming to be compatible with.
 // We check it at runtime using `NSS_VersionCheck`.
 pub const COMPATIBLE_NSS_VERSION: &str = "3.26";
 
 static NSS_INIT: Once = Once::new();
+#[cfg(feature = "keydb")]
+static NSS_INIT_WITH_PROFILE_DIR: Once = Once::new();
 
 pub fn ensure_nss_initialized() {
     NSS_INIT.call_once(|| {
@@ -37,6 +46,69 @@ pub fn ensure_nss_initialized() {
         if context.is_null() {
             let error = get_last_error();
             panic!("Could not initialize NSS: {}", error);
+        }
+    })
+}
+
+/// Use this function to initialize NSS if you want to manage keys with NSS.
+/// ensure_initialized_with_profile_dir initializes NSS with a profile directory (where key4.db
+/// will be stored) and appropriate flags to persist keys (and certificates) in its internal PKCS11
+/// software implementation. This function must be called first; if `ensure_initialized` is called
+/// before, this one will fail.
+#[cfg(feature = "keydb")]
+pub fn ensure_nss_initialized_with_profile_dir(path: impl AsRef<Path>) {
+    if NSS_INIT.is_completed() {
+        panic!("NSS has been initialized without a profile dir before.");
+    }
+
+    NSS_INIT_WITH_PROFILE_DIR.call_once(|| {
+        let version_ptr = CString::new(COMPATIBLE_NSS_VERSION).unwrap();
+        if unsafe { NSS_VersionCheck(version_ptr.as_ptr()) == PR_FALSE } {
+            panic!("Incompatible NSS version!")
+        }
+        let c_path: CString = CString::new(path.as_ref().to_str().unwrap()).unwrap();
+        if fs::metadata(path).is_err() {
+            panic!(
+                "Could not initialize NSS: missing profile dir: {:?}",
+                c_path
+            );
+        }
+
+        let empty = CString::default();
+        let flags = NSS_INIT_FORCEOPEN | NSS_INIT_OPTIMIZESPACE;
+
+        let context = unsafe {
+            NSS_InitContext(
+                c_path.as_ptr(),
+                empty.as_ptr(),
+                empty.as_ptr(),
+                empty.as_ptr(),
+                std::ptr::null_mut(),
+                flags,
+            )
+        };
+        if context.is_null() {
+            let error = get_last_error();
+            panic!("Could not initialize NSS: {}", error);
+        }
+
+        let Ok(slot) = slot::get_internal_key_slot() else {
+            let error = get_last_error();
+            panic!("Could not get internal key slot: {}", error);
+        };
+
+        if unsafe { PK11_NeedUserInit(slot.as_mut_ptr()) } == nss_sys::PR_TRUE {
+            let result = unsafe {
+                PK11_InitPin(
+                    slot.as_mut_ptr(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                )
+            };
+            if result != SECStatus::SECSuccess {
+                let error = get_last_error();
+                panic!("Could not initialize internal key slot: {}", error);
+            }
         }
     })
 }
@@ -126,4 +198,18 @@ pub(crate) unsafe fn sec_item_as_slice(sec_item: &mut SECItem) -> Result<&mut [u
     let sec_item_buf_len = usize::try_from(sec_item.len)?;
     let buf = std::slice::from_raw_parts_mut(sec_item.data, sec_item_buf_len);
     Ok(buf)
+}
+
+#[cfg(test)]
+#[cfg(feature = "keydb")]
+mod test {
+    use super::*;
+
+    #[test]
+    #[should_panic]
+    fn test_ensure_nss_initialized_with_profile_dir_with_previously_call_to_ensure_nss_initialized()
+    {
+        ensure_nss_initialized();
+        ensure_nss_initialized_with_profile_dir("./");
+    }
 }

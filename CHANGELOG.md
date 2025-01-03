@@ -2,6 +2,7 @@
 
 ### `rc_crypto`
 - New low level bindings for dealing with primary password.
+- New feature flag `keydb` in `rc_crypto/nss`, which enables NSS key persistence: `ensure_initialized_with_profile_dir(path: impl AsRef<Path>)` initializes NSS with a profile directory and appropriate flags to persist keys (and certificates) in its internal PKCS11 software implementation. This function must be called first; if `ensure_initialized` is called before, it will fail.
 
 [Full Changelog](In progress)
 
