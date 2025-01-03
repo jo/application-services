@@ -42,6 +42,7 @@ extern "C" {
         isPerm: PRBool,
         wincx: *mut c_void,
     ) -> *mut PK11SymKey;
+    pub fn PK11_SetSymKeyNickname(key: *mut PK11SymKey, name: *const c_char) -> SECStatus;
     pub fn PK11_Derive(
         baseKey: *mut PK11SymKey,
         mechanism: CK_MECHANISM_TYPE,
