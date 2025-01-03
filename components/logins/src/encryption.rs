@@ -51,6 +51,13 @@
 use crate::error::*;
 use std::sync::Arc;
 
+#[cfg(feature = "keydb")]
+use nss::ensure_initialized_with_profile_dir;
+#[cfg(feature = "keydb")]
+use nss::pk11::sym_key::retrieve_or_create_and_import_and_persist_aes256_key_data;
+#[cfg(feature = "keydb")]
+use std::path::Path;
+
 /// This is the generic EncryptorDecryptor trait, as handed over to the Store during initialization.
 /// Consumers can implement either this generic trait and bring in their own crypto, or leverage the
 /// ManagedEncryptorDecryptor below, which provides encryption algorithms out of the box.
@@ -157,6 +164,37 @@ impl KeyManager for StaticKeyManager {
     #[handle_error(Error)]
     fn get_key(&self) -> ApiResult<Vec<u8>> {
         Ok(self.key.as_bytes().into())
+    }
+}
+
+/// This is for Desktop
+#[cfg(feature = "keydb")]
+pub struct NSSKeyManager {}
+
+#[cfg(feature = "keydb")]
+impl NSSKeyManager {
+    pub fn new(path: impl AsRef<Path>) -> Self {
+        ensure_initialized_with_profile_dir(path);
+        Self {}
+    }
+}
+
+#[cfg(feature = "keydb")]
+static KEY_NAME: &str = "as-logins-key";
+
+#[cfg(feature = "keydb")]
+impl KeyManager for NSSKeyManager {
+    #[handle_error(Error)]
+    fn get_key(&self) -> ApiResult<Vec<u8>> {
+        let key = retrieve_or_create_and_import_and_persist_aes256_key_data(KEY_NAME)
+            .expect("Could not get key via NSS");
+        let mut bytes: Vec<u8> = Vec::new();
+        serde_json::to_writer(
+            &mut bytes,
+            &jwcrypto::Jwk::new_direct_from_bytes(None, &key),
+        )
+        .unwrap();
+        Ok(bytes)
     }
 }
 

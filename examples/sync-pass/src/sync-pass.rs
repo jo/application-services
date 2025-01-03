@@ -10,11 +10,10 @@ use cli_support::fxa_creds::{
     get_account_and_token, get_cli_fxa, get_default_fxa_config, SYNC_SCOPE,
 };
 use cli_support::prompt::{prompt_char, prompt_string, prompt_usize};
-use logins::encryption::{create_key, ManagedEncryptorDecryptor, StaticKeyManager};
+use logins::encryption::{KeyManager, ManagedEncryptorDecryptor, NSSKeyManager};
 use logins::{Login, LoginEntry, LoginStore, LoginsSyncEngine, ValidateAndFixup};
 
 use prettytable::{row, Cell, Row, Table};
-use std::fs;
 use std::sync::Arc;
 use sync15::{
     client::{sync_multiple, MemoryCachedState, Sync15StorageClientInit},
@@ -273,32 +272,13 @@ fn prompt_record_id(s: &LoginStore, action: &str) -> Result<Option<String>> {
     Ok(Some(index_to_id[input].as_str().into()))
 }
 
-fn open_database(db_path: &str) -> Result<(LoginStore, String)> {
-    let encryption_key = get_or_create_encryption_key()?;
-    let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(
-        StaticKeyManager::new(encryption_key.clone()),
-    )));
+fn open_database(profile_path: &str, db_path: &str) -> Result<(LoginStore, String)> {
+    let key_manager = NSSKeyManager::new(profile_path);
+    let keybytes = key_manager.get_key().unwrap();
+    let encryption_key = std::str::from_utf8(&keybytes).unwrap().to_string();
+    let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(key_manager)));
     let store = LoginStore::new(db_path, encdec)?;
     Ok((store, encryption_key))
-}
-
-fn get_or_create_encryption_key() -> Result<String> {
-    match get_encryption_key() {
-        Ok(encryption_key) => Ok(encryption_key),
-        Err(_) => {
-            let encryption_key = create_key()?;
-            set_encryption_key(encryption_key.clone())?;
-            Ok(encryption_key)
-        }
-    }
-}
-
-fn get_encryption_key() -> Result<String, std::io::Error> {
-    fs::read_to_string("logins.jwk")
-}
-
-fn set_encryption_key(encryption_key: String) -> Result<(), std::io::Error> {
-    fs::write("logins.jwk", encryption_key)
 }
 
 fn do_sync(
@@ -352,6 +332,15 @@ fn main() -> Result<()> {
     let matches = clap::Command::new("sync_pass_sql")
         .about("CLI login syncing tool")
         .arg(
+            clap::Arg::new("profile_path")
+                .short('p')
+                .long("profile")
+                .default_value("./")
+                .value_name("PROFILE_PATH")
+                .num_args(1)
+                .help("Path to the profile directory (default: \"./\")"),
+        )
+        .arg(
             clap::Arg::new("database_path")
                 .short('d')
                 .long("database")
@@ -375,12 +364,14 @@ fn main() -> Result<()> {
 
     let cred_file = matches.get_one::<String>("credential_file").unwrap();
     let db_path = matches.get_one::<String>("database_path").unwrap();
+    let profile_path = matches.get_one::<String>("profile_path").unwrap();
 
     log::debug!("credential file: {:?}", cred_file);
     log::debug!("db: {:?}", db_path);
+    log::debug!("profile: {:?}", profile_path);
     // Lets not log the encryption key, it's just not a good habit to be in.
 
-    let (store, encryption_key) = open_database(db_path)?;
+    let (store, encryption_key) = open_database(profile_path, db_path)?;
     let store = Arc::new(store);
 
     log::info!("Store has {} passwords", store.list()?.len());

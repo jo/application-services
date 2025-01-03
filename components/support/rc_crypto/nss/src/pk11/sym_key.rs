@@ -118,7 +118,6 @@ pub fn retrieve_or_create_and_import_and_persist_aes256_key_data(name: &str) -> 
 
 #[cfg(feature = "keydb")]
 fn retrieve_aes256_key(name: &str) -> Result<SymKey> {
-    ensure_nss_initialized();
     let slot = slot::get_internal_key_slot()?;
     let name = CString::new(name).unwrap();
     let sym_key = unsafe {
@@ -191,7 +190,6 @@ fn retrieve_aes256_key(name: &str) -> Result<SymKey> {
 
 #[cfg(feature = "keydb")]
 fn create_and_import_and_persist_aes256_key(name: &str) -> Result<SymKey> {
-    ensure_nss_initialized();
     let mut key_bytes: [u8; nss_sys::AES_256_KEY_LENGTH as usize] =
         [0; nss_sys::AES_256_KEY_LENGTH as usize];
     map_nss_secstatus(|| unsafe {
@@ -222,7 +220,6 @@ fn import_and_persist_sym_key(
     operation: nss_sys::CK_ATTRIBUTE_TYPE,
     buf: &[u8],
 ) -> Result<SymKey> {
-    ensure_nss_initialized();
     let mut item = nss_sys::SECItem {
         type_: nss_sys::SECItemType::siBuffer as u32,
         data: buf.as_ptr() as *mut c_uchar,
@@ -230,7 +227,6 @@ fn import_and_persist_sym_key(
     };
     let slot = slot::get_internal_key_slot()?;
     unsafe {
-        // FIXME: this does not work until we set isPerm to false
         SymKey::from_ptr(nss_sys::PK11_ImportSymKeyWithFlags(
             slot.as_mut_ptr(),
             mechanism,
