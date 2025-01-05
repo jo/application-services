@@ -10,6 +10,8 @@ extern "C" {
     pub fn PK11_GetInternalSlot() -> *mut PK11SlotInfo;
     pub fn PK11_GetInternalKeySlot() -> *mut PK11SlotInfo;
     pub fn PK11_NeedUserInit(slot: *mut PK11SlotInfo) -> PRBool;
+    pub fn PK11_NeedLogin(slot: *mut PK11SlotInfo) -> PRBool;
+    pub fn PK11_CheckUserPassword(slot: *mut PK11SlotInfo, password: *mut c_char) -> SECStatus;
     pub fn PK11_GenerateRandom(data: *mut c_uchar, len: c_int) -> SECStatus;
     pub fn PK11_FreeSymKey(key: *mut PK11SymKey);
     pub fn PK11_InitPin(

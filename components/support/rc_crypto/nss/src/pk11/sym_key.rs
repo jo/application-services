@@ -94,6 +94,33 @@ pub(crate) fn import_sym_key(
 }
 
 #[cfg(feature = "keydb")]
+pub fn authentication_with_primary_password_is_needed() -> Result<bool> {
+    let slot = slot::get_internal_key_slot()?;
+
+    unsafe {
+        Ok(nss_sys::PK11_NeedLogin(slot.as_mut_ptr()) == nss_sys::PR_TRUE)
+    }
+}
+
+#[cfg(feature = "keydb")]
+pub fn authenticate_with_primary_password(primary_password: &str) -> Result<bool> {
+    let slot = slot::get_internal_key_slot()?;
+
+    let password_cstr = CString::new(primary_password).unwrap();
+    unsafe {
+        Ok(nss_sys::PK11_CheckUserPassword(slot.as_mut_ptr(), password_cstr.as_ptr() as *mut c_char) == nss_sys::SECStatus::SECSuccess)
+    }
+
+    // if auth_status != nss_sys::SECStatus::SECSuccess {
+    //     let error = get_last_error();
+    //     panic!("Could not authenticate using the Primary Password: {}", error);
+    // } else {
+    //     println!("Successfully logged in");
+    // }
+
+}
+
+#[cfg(feature = "keydb")]
 pub fn retrieve_or_create_and_import_and_persist_aes256_key_data(name: &str) -> Result<Vec<u8>> {
     let sym_key = match retrieve_aes256_key(name) {
         Ok(sym_key) => {

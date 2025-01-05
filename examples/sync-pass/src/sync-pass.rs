@@ -10,8 +10,8 @@ use cli_support::fxa_creds::{
     get_account_and_token, get_cli_fxa, get_default_fxa_config, SYNC_SCOPE,
 };
 use cli_support::prompt::{prompt_char, prompt_string, prompt_usize};
-use logins::encryption::{KeyManager, ManagedEncryptorDecryptor, NSSKeyManager};
-use logins::{Login, LoginEntry, LoginStore, LoginsSyncEngine, ValidateAndFixup};
+use logins::encryption::{KeyManager, ManagedEncryptorDecryptor, NSSKeyManager, PrimaryPasswordAuthenticator};
+use logins::{Login, LoginEntry, LoginStore, LoginsSyncEngine, ValidateAndFixup, LoginsApiError};
 
 use prettytable::{row, Cell, Row, Table};
 use std::sync::Arc;
@@ -272,8 +272,16 @@ fn prompt_record_id(s: &LoginStore, action: &str) -> Result<Option<String>> {
     Ok(Some(index_to_id[input].as_str().into()))
 }
 
+struct MyPrimaryPasswordAuthenticator {}
+impl PrimaryPasswordAuthenticator for MyPrimaryPasswordAuthenticator {
+    fn get_primary_password(&self) -> Result<String, LoginsApiError> {
+        let password = prompt_string("primary password").unwrap_or_default();
+        Ok(password.to_owned())
+    }
+}
+
 fn open_database(profile_path: &str, db_path: &str) -> Result<(LoginStore, String)> {
-    let key_manager = NSSKeyManager::new(profile_path);
+    let key_manager = NSSKeyManager::new(profile_path, Arc::new(MyPrimaryPasswordAuthenticator {}));
     let keybytes = key_manager.get_key().unwrap();
     let encryption_key = std::str::from_utf8(&keybytes).unwrap().to_string();
     let encdec = Arc::new(ManagedEncryptorDecryptor::new(Arc::new(key_manager)));

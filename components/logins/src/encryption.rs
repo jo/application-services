@@ -54,7 +54,7 @@ use std::sync::Arc;
 #[cfg(feature = "keydb")]
 use nss::ensure_initialized_with_profile_dir;
 #[cfg(feature = "keydb")]
-use nss::pk11::sym_key::retrieve_or_create_and_import_and_persist_aes256_key_data;
+use nss::pk11::sym_key::{retrieve_or_create_and_import_and_persist_aes256_key_data, authentication_with_primary_password_is_needed, authenticate_with_primary_password};
 #[cfg(feature = "keydb")]
 use std::path::Path;
 
@@ -168,14 +168,22 @@ impl KeyManager for StaticKeyManager {
 }
 
 /// This is for Desktop
+
 #[cfg(feature = "keydb")]
-pub struct NSSKeyManager {}
+pub trait PrimaryPasswordAuthenticator: Send + Sync {
+    fn get_primary_password(&self) -> ApiResult<String>;
+}
+
+#[cfg(feature = "keydb")]
+pub struct NSSKeyManager {
+    primary_password_authenticator: Arc<dyn PrimaryPasswordAuthenticator>,
+}
 
 #[cfg(feature = "keydb")]
 impl NSSKeyManager {
-    pub fn new(path: impl AsRef<Path>) -> Self {
+    pub fn new(path: impl AsRef<Path>, primary_password_authenticator: Arc<dyn PrimaryPasswordAuthenticator>) -> Self {
         ensure_initialized_with_profile_dir(path);
-        Self {}
+        Self { primary_password_authenticator }
     }
 }
 
@@ -186,6 +194,27 @@ static KEY_NAME: &str = "as-logins-key";
 impl KeyManager for NSSKeyManager {
     #[handle_error(Error)]
     fn get_key(&self) -> ApiResult<Vec<u8>> {
+        match authentication_with_primary_password_is_needed() {
+            Ok(is_needed) => {
+                if is_needed {
+                    match self.primary_password_authenticator.get_primary_password() {
+                        Ok(primary_password) => {
+                            match authenticate_with_primary_password(&primary_password) {
+                                Ok(result) => {
+                                    if !result {
+                                        panic!("wrong password");
+                                    }
+                                }
+                                Err(_) => panic!("authentication failed")
+                            };
+                        },
+                        Err(_) => panic!("could not get primary password")
+                    }
+                }
+            },
+            Err(_) => panic!("primary password check failed"),
+        }
+
         let key = retrieve_or_create_and_import_and_persist_aes256_key_data(KEY_NAME)
             .expect("Could not get key via NSS");
         let mut bytes: Vec<u8> = Vec::new();

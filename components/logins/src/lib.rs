@@ -22,7 +22,7 @@ use crate::encryption::{
 uniffi::include_scaffolding!("logins");
 
 #[cfg(feature = "keydb")]
-pub use crate::encryption::NSSKeyManager;
+pub use crate::encryption::{NSSKeyManager, PrimaryPasswordAuthenticator};
 
 pub use crate::db::LoginDb;
 use crate::encryption::{check_canary, create_canary, create_key};
