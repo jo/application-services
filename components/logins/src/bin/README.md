@@ -17,8 +17,6 @@ export NSS_STATIC=1
 
 ### 1. Get data from STMO
 
-Run the `Origin Errors for AS Login Validation Tool` query on the [PWMGR Rust MigrationTelemetry Dashboard](https://sql.telemetry.mozilla.org/dashboard/password-manager-rust-migration-telemetry),
-remove the `LIMIT` clause, and download the results as CSV into `src/bin/`.
 
 ### 2. Convert and validate
 
