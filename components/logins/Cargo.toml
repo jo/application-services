@@ -6,6 +6,10 @@ authors = ["Thom Chiovoloni <tchiovoloni@mozilla.com>"]
 license = "MPL-2.0"
 exclude = ["/android", "/ios"]
 
+[[bin]]
+name = "validate_logins"
+path = "src/bin/validate_logins.rs"
+
 [features]
 default = []
 keydb = ["nss/keydb", "dep:async-trait", "dep:futures"]
