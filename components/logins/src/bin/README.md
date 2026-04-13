@@ -28,6 +28,17 @@ python3 tools/stmo_to_ndjson.py src/bin/<file>.csv \
   > src/bin/results.txt
 ```
 
+Alternatively, run
+
+```
+cat ~/CSV-EXPORT.json \
+  | ./tools/massage-logins.sh \
+  | cargo run --bin validate_logins --features ignore_form_action_origin_validation_errors
+```
+
+which also does further origin normalization.
+
+
 ### 3. Read results
 
 Each line in `results.txt` corresponds to one entry:

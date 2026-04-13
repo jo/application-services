@@ -43,15 +43,15 @@ fn main() {
 
         match entry.maybe_fixup() {
             Ok(None) => {
-                println!("[{i}] ok");
+                // println!("[{i} {}] ok", entry.origin);
                 ok += 1;
             }
             Ok(Some(fixed_entry)) => {
-                println!("[{i}] fixed: {fixed_entry:?}");
+                // println!("[{i} {}] fixed: {fixed_entry:?}", entry.origin);
                 fixed += 1;
             }
             Err(e) => {
-                println!("[{i}] invalid: {e}");
+                println!("[{i} {}] invalid: {e}", entry.origin);
                 *invalid_counts.entry(e.to_string()).or_default() += 1;
             }
         }
